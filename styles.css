@@ -1,0 +1,79 @@
+/* ══════════════════════════════════════════════
+   小红书笔记一键复制 - 样式
+   ══════════════════════════════════════════════ */
+
+/* ── 按钮基础样式 ── */
+#xhs-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: 0 2px 12px rgba(255, 71, 87, 0.35);
+  transition: all 0.25s ease;
+  z-index: 99999;
+  position: relative;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+#xhs-copy-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(255, 71, 87, 0.5);
+}
+
+#xhs-copy-btn:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 1px 6px rgba(255, 71, 87, 0.3);
+}
+
+#xhs-copy-btn svg {
+  flex-shrink: 0;
+}
+
+#xhs-copy-btn span {
+  white-space: nowrap;
+}
+
+/* ── Toast 提示 ── */
+#xhs-copy-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 999999;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.xhs-copy-success {
+  background: linear-gradient(135deg, #2ed573 0%, #7bed9f 100%);
+}
+
+.xhs-copy-error {
+  background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+}
+
+.xhs-copy-show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
