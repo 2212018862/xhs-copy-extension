@@ -207,23 +207,40 @@
 
     const noteType = videoEl ? "video" : "normal";
     const comments = [];
-    container.querySelectorAll('[class*="comment-item"]').forEach(el => {
+
+    // ★ 评论可能不在 #noteContainer 里，动态找包含 comment-item 的容器
+    let commentRoot = container;
+    if (!container.querySelector('[class*="comment-item"]')) {
+      // container 里没有评论，找真正的评论容器
+      document.querySelectorAll('*').forEach(el => {
+        if (commentRoot !== container) return;
+        const style = getComputedStyle(el);
+        if ((style.overflow === 'auto' || style.overflow === 'scroll' ||
+             style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+            el.scrollHeight > el.clientHeight + 10 &&
+            el.querySelectorAll('[class*="comment-item"]').length > 0) {
+          commentRoot = el;
+        }
+      });
+    }
+
+    commentRoot.querySelectorAll('[class*="comment-item"]').forEach(el => {
       try {
         const nameEl = el.querySelector('[class*="name"], [class*="nickname"], [class*="user"]');
         const contentEl = el.querySelector('[class*="content"], [class*="text"], [class*="desc"]');
         if (contentEl) {
           const text = (contentEl.textContent || "").trim();
           const user = nameEl ? (nameEl.textContent || "").trim() : "";
-          if (text.length > 2 && comments.length < 20) {
+          if (text.length > 2 && comments.length < 1000) {
             comments.push({ user, content: text, likes: 0 });
           }
         }
       } catch (_) {}
     });
     if (comments.length === 0) {
-      container.querySelectorAll('[class*="comment-content"], [class*="comment-text"]').forEach(el => {
+      commentRoot.querySelectorAll('[class*="comment-content"], [class*="comment-text"]').forEach(el => {
         const text = (el.textContent || "").trim();
-        if (text.length > 2 && comments.length < 20) comments.push({ user: "", content: text, likes: 0 });
+        if (text.length > 2 && comments.length < 1000) comments.push({ user: "", content: text, likes: 0 });
       });
     }
 
