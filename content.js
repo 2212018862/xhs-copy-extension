@@ -12,6 +12,10 @@
   const TOAST_ID = "xhs-copy-toast";
   const noteQueue = [];
 
+  function getMaxComments() {
+    return parseInt(localStorage.getItem("xhs_max_comments")) || 100;
+  }
+
   function normalizeUrl(url) {
     if (!url) return "";
     if (url.startsWith("//")) return "https:" + url;
@@ -131,7 +135,7 @@
           try {
             const commentMap = state?.comment?.commentMap || state?.note?.commentMap || {};
             const list = commentMap[currentUrlNoteId] || state?.comment?.commentList || [];
-            for (const c of list.slice(0, 1000)) {
+            for (const c of list.slice(0, getMaxComments())) {
               const user = c.userInfo?.nickname || c.user?.nickname || "匿名";
               const content = (c.content || "").replace(/\n+/g, " ");
               const likes = c.likeCount || 0;
@@ -231,12 +235,12 @@
         const contentEl = el.querySelector('[class*="content"], [class*="text"], [class*="desc"], [class*="body"], p');
         const user = nameEl ? (nameEl.textContent || "").trim() : "";
         const text = contentEl ? (contentEl.textContent || "").trim() : (el.textContent || "").trim();
-        if (comments.length < 1000) {
+        if (comments.length < getMaxComments()) {
           comments.push({ user, content: text || "(空)", likes: 0 });
         }
       } catch (e) {
         // 即使出错也记录
-        if (comments.length < 1000) {
+        if (comments.length < getMaxComments()) {
           comments.push({ user: "", content: "(提取异常)", likes: 0 });
         }
       }
@@ -245,7 +249,7 @@
     if (comments.length === 0) {
       commentRoot.querySelectorAll('[class*="comment-content"], [class*="comment-text"], [class*="comment-body"]').forEach(el => {
         const text = (el.textContent || "").trim();
-        if (text.length > 0 && comments.length < 1000) comments.push({ user: "", content: text, likes: 0 });
+        if (text.length > 0 && comments.length < getMaxComments()) comments.push({ user: "", content: text, likes: 0 });
       });
     }
 
@@ -260,7 +264,7 @@
     return container.querySelectorAll('[class*="comment-item"]').length;
   }
 
-  async function scrollToLoadComments(maxCount = 1000) {
+  async function scrollToLoadComments(maxCount) {
     // ★ 通过可滚动元素检测找到真正的评论滚动容器
     let scrollTarget = null;
     document.querySelectorAll('*').forEach(el => {
@@ -322,7 +326,7 @@
 
   async function extractNoteContent() {
     // 先滚动评论区加载全部评论
-    await scrollToLoadComments(1000);
+    await scrollToLoadComments(getMaxComments());
 
     const pageUrl = window.location.href;
     const pageNoteId = (location.pathname.match(/\/explore\/([^/?#]+)/) || [])[1] || "";
