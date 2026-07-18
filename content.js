@@ -120,24 +120,13 @@
             }
           } catch (_) {}
 
-          // 视频 — performance 网络请求（仅当前页面有视频元素或 state 标记为视频时才查）
-          let videoUrlFromPerf = "";
-          if (noteType === "video" || document.querySelector("video")) {
-            try {
-              for (const e of performance.getEntriesByType("resource")) {
-                if (e.name && (e.name.includes("sns-video") || e.name.includes("xhscdn") && e.name.includes(".mp4"))) {
-                  videoUrlFromPerf = normUrl(e.name);
-                  break;
-                }
-              }
-            } catch (_) {}
-          }
+          // 不用 performance API（会残留旧笔记的请求记录）
 
-          const videoUrl = videoUrlFromDom || videoUrlFromState || videoUrlFromPerf;
+          const videoUrl = videoUrlFromDom || videoUrlFromState;
 
           console.log("[XHS-Copy] extraction:", {
             noteType, images: images.length, videoUrl: videoUrl ? "found" : "empty",
-            videoSources: { state: !!videoUrlFromState, dom: !!videoUrlFromDom, perf: !!videoUrlFromPerf }
+            videoSources: { state: !!videoUrlFromState, dom: !!videoUrlFromDom }
           });
 
           // 评论
@@ -212,15 +201,7 @@
       const raw = videoEl.src || videoEl.currentSrc || videoEl.querySelector("source")?.src || "";
       if (raw && !raw.startsWith("blob:")) videoUrl = normalizeUrl(raw);
     }
-    if (!videoUrl && videoEl) {
-      try {
-        for (const e of performance.getEntriesByType("resource")) {
-          if (e.name && (e.name.includes("sns-video") || (e.name.includes("xhscdn") && e.name.includes(".mp4")))) {
-            videoUrl = normalizeUrl(e.name); break;
-          }
-        }
-      } catch (_) {}
-    }
+    // 不用 performance API 兜底——会残留旧笔记的视频请求记录，导致串数据
 
     const noteType = videoEl ? "video" : "normal";
     const comments = [];
