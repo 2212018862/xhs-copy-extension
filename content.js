@@ -11,9 +11,19 @@
   const QUEUE_PANEL_ID = "xhs-queue-panel";
   const TOAST_ID = "xhs-copy-toast";
   const noteQueue = [];
+  let maxComments = 10;
+
+  // 从 chrome.storage 读取配置（扩展内共享）
+  chrome.storage.local.get("xhs_max_comments", (result) => {
+    if (result.xhs_max_comments !== undefined) maxComments = result.xhs_max_comments;
+  });
+  // 监听配置变化（popup 保存后实时生效）
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.xhs_max_comments) maxComments = changes.xhs_max_comments.newValue;
+  });
 
   function getMaxComments() {
-    return parseInt(localStorage.getItem("xhs_max_comments")) || 10;
+    return maxComments;
   }
 
   function normalizeUrl(url) {
