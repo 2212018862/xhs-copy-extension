@@ -239,35 +239,30 @@
   }
 
   async function scrollToLoadComments(maxCount = 1000) {
-    const container = document.querySelector("#noteContainer, .note-container");
-    if (!container) return;
-
-    // 找所有可能的评论滚动容器，选最合适的
-    const candidates = [
-      container.querySelector('[class*="comments-container"]'),
-      container.querySelector('[class*="comment-list"]'),
-      container.querySelector('[class*="comment-inner"]'),
-      container.querySelector('[class*="note-scroller"]'),
-      container.querySelector('[class*="note-content"]'),
-    ].filter(Boolean);
-
-    // 选 scrollHeight > clientHeight 的容器（可滚动的）
+    // ★ 通过可滚动元素检测找到真正的评论滚动容器
     let scrollTarget = null;
-    for (const el of candidates) {
-      if (el.scrollHeight > el.clientHeight + 10) {
+    document.querySelectorAll('*').forEach(el => {
+      if (scrollTarget) return;
+      const style = getComputedStyle(el);
+      if ((style.overflow === 'auto' || style.overflow === 'scroll' ||
+           style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+          el.scrollHeight > el.clientHeight + 10 &&
+          el.querySelectorAll('[class*="comment"]').length > 0) {
         scrollTarget = el;
-        break;
       }
-    }
-    // 都没找到，用 document 滚
-    if (!scrollTarget) scrollTarget = document.scrollingElement || document.documentElement;
+    });
+    if (!scrollTarget) return;
+
+    // 找 comment-item 的实际容器来计数
+    const commentContainer = scrollTarget;
 
     let prevCount = 0;
     let staleRounds = 0;
     const MAX_STALE = 5;
 
     for (let i = 0; i < 300; i++) {
-      const currentCount = countComments(container);
+      const currentCount = commentContainer.querySelectorAll('[class*="comment-item"]').length;
+
       if (currentCount >= maxCount) break;
 
       if (currentCount === prevCount) {
@@ -275,26 +270,23 @@
         if (staleRounds >= MAX_STALE) break;
       } else {
         staleRounds = 0;
-        // 有新评论，显示进度
         showToast(`⏳ 已加载 ${currentCount} 条评论...`);
       }
       prevCount = currentCount;
 
       // 尝试点击"查看更多"按钮
       try {
-        const moreBtn = container.querySelector('[class*="show-more"], [class*="load-more"], [class*="more-comment"]');
+        const moreBtn = commentContainer.querySelector('[class*="show-more"], [class*="load-more"], [class*="more-comment"], [class*="view-more"]');
         if (moreBtn) moreBtn.click();
       } catch (_) {}
 
-      // 滚动到底
+      // ★ 只滚动评论容器，不滚页面
       scrollTarget.scrollTop = scrollTarget.scrollHeight;
-      // 也尝试滚整个页面（某些布局下评论在页面底部）
-      window.scrollTo(0, document.body.scrollHeight);
 
       await new Promise(r => setTimeout(r, 600));
     }
 
-    const finalCount = countComments(container);
+    const finalCount = commentContainer.querySelectorAll('[class*="comment-item"]').length;
     if (finalCount > 0) showToast(`✅ 已加载 ${finalCount} 条评论`);
   }
 
