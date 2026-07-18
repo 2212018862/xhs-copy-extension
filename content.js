@@ -128,7 +128,7 @@
           try {
             const commentMap = state?.comment?.commentMap || state?.note?.commentMap || {};
             const list = commentMap[currentUrlNoteId] || state?.comment?.commentList || [];
-            for (const c of list.slice(0, 20)) {
+            for (const c of list.slice(0, 1000)) {
               const user = c.userInfo?.nickname || c.user?.nickname || "匿名";
               const content = (c.content || "").replace(/\n+/g, " ");
               const likes = c.likeCount || 0;
