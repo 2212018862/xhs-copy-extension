@@ -234,41 +234,68 @@
   //  自动滚动评论区，触发懒加载
   // ══════════════════════════════════════════
 
+  function countComments(container) {
+    return container.querySelectorAll('[class*="comment-item"]').length;
+  }
+
   async function scrollToLoadComments(maxCount = 1000) {
-    // 找到评论区滚动容器
     const container = document.querySelector("#noteContainer, .note-container");
     if (!container) return;
 
-    // 尝试找评论区的滚动容器（通常是可滚动的父元素）
-    const commentSection = container.querySelector('[class*="comment-list"], [class*="comments-container"], [class*="comment-inner"], [class*="note-scroller"]');
-    // 如果找不到专门的评论容器，用主容器
-    const scrollTarget = commentSection || container;
+    // 找所有可能的评论滚动容器，选最合适的
+    const candidates = [
+      container.querySelector('[class*="comments-container"]'),
+      container.querySelector('[class*="comment-list"]'),
+      container.querySelector('[class*="comment-inner"]'),
+      container.querySelector('[class*="note-scroller"]'),
+      container.querySelector('[class*="note-content"]'),
+    ].filter(Boolean);
+
+    // 选 scrollHeight > clientHeight 的容器（可滚动的）
+    let scrollTarget = null;
+    for (const el of candidates) {
+      if (el.scrollHeight > el.clientHeight + 10) {
+        scrollTarget = el;
+        break;
+      }
+    }
+    // 都没找到，用 document 滚
+    if (!scrollTarget) scrollTarget = document.scrollingElement || document.documentElement;
 
     let prevCount = 0;
     let staleRounds = 0;
-    const MAX_STALE = 3; // 连续3次没新内容就停止
+    const MAX_STALE = 5;
 
-    for (let i = 0; i < 200; i++) { // 最多滚动200次
-      // 统计当前评论数
-      const comments = container.querySelectorAll('[class*="comment-item"]');
-      const currentCount = comments.length;
-
+    for (let i = 0; i < 300; i++) {
+      const currentCount = countComments(container);
       if (currentCount >= maxCount) break;
 
       if (currentCount === prevCount) {
         staleRounds++;
-        if (staleRounds >= MAX_STALE) break; // 没有新评论了
+        if (staleRounds >= MAX_STALE) break;
       } else {
         staleRounds = 0;
+        // 有新评论，显示进度
+        showToast(`⏳ 已加载 ${currentCount} 条评论...`);
       }
       prevCount = currentCount;
 
-      // 滚动到底部
-      scrollTarget.scrollTop = scrollTarget.scrollHeight;
+      // 尝试点击"查看更多"按钮
+      try {
+        const moreBtn = container.querySelector('[class*="show-more"], [class*="load-more"], [class*="more-comment"]');
+        if (moreBtn) moreBtn.click();
+      } catch (_) {}
 
-      // 等待加载（给异步请求时间）
-      await new Promise(r => setTimeout(r, 500));
+      // 滚动到底
+      scrollTarget.scrollTop = scrollTarget.scrollHeight;
+      // 也尝试滚整个页面（某些布局下评论在页面底部）
+      window.scrollTo(0, document.body.scrollHeight);
+
+      await new Promise(r => setTimeout(r, 600));
     }
+
+    const finalCount = countComments(container);
+    if (finalCount > 0) showToast(`✅ 已加载 ${finalCount} 条评论`);
   }
 
   // ══════════════════════════════════════════
@@ -343,14 +370,16 @@
       if (!text) { showToast("⚠️ 未能提取笔记内容", false); return; }
       try {
         await navigator.clipboard.writeText(text);
-        showToast(`✅ 已复制！（via ${data.source}）`);
+        const commentCount = data.comments?.length || 0;
+        showToast(`✅ 已复制！${commentCount ? `含${commentCount}条评论 · ` : ''}via ${data.source}`);
       } catch {
         try {
           const ta = document.createElement("textarea");
           ta.value = text; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
           document.body.appendChild(ta); ta.select(); document.execCommand("copy");
           document.body.removeChild(ta);
-          showToast(`✅ 已复制！（via ${data.source}）`);
+          const commentCount = data.comments?.length || 0;
+          showToast(`✅ 已复制！${commentCount ? `含${commentCount}条评论 · ` : ''}via ${data.source}`);
         } catch { showToast("❌ 复制失败", false); }
       }
     });
