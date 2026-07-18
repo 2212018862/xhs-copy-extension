@@ -270,10 +270,12 @@
     });
     if (!scrollTarget) return;
 
-    // 找 comment-item 的实际容器来计数
     const commentContainer = scrollTarget;
+    let prevCount = commentContainer.querySelectorAll('[class*="comment-item"]').length;
 
-    let prevCount = 0;
+    // 先显示当前已有的评论数
+    showToast(`⏳ 已加载 ${prevCount} 条评论，滚动加载更多...`);
+
     let staleRounds = 0;
     const MAX_STALE = 5;
 
@@ -304,7 +306,7 @@
     }
 
     const finalCount = commentContainer.querySelectorAll('[class*="comment-item"]').length;
-    if (finalCount > 0) showToast(`✅ 已加载 ${finalCount} 条评论`);
+    showToast(`✅ 已加载 ${finalCount} 条评论`);
   }
 
   // ══════════════════════════════════════════
