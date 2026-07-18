@@ -201,7 +201,18 @@
       const raw = videoEl.src || videoEl.currentSrc || videoEl.querySelector("source")?.src || "";
       if (raw && !raw.startsWith("blob:")) videoUrl = normalizeUrl(raw);
     }
-    // 不用 performance API 兜底——会残留旧笔记的视频请求记录，导致串数据
+    // blob URL 时用 performance API 取真实 CDN 链接（仅当前页面有 <video> 才查）
+    if (!videoUrl && videoEl) {
+      try {
+        let lastMatch = "";
+        for (const e of performance.getEntriesByType("resource")) {
+          if (e.name && (e.name.includes("sns-video") || (e.name.includes("xhscdn") && e.name.includes(".mp4")))) {
+            lastMatch = normalizeUrl(e.name); // 取最后一个匹配（最新的）
+          }
+        }
+        if (lastMatch) videoUrl = lastMatch;
+      } catch (_) {}
+    }
 
     const noteType = videoEl ? "video" : "normal";
     const comments = [];
