@@ -226,21 +226,21 @@
 
     commentRoot.querySelectorAll('[class*="comment-item"]').forEach(el => {
       try {
+        // 取所有文本内容拼接，不依赖特定子元素 class
         const nameEl = el.querySelector('[class*="name"], [class*="nickname"], [class*="user"]');
-        const contentEl = el.querySelector('[class*="content"], [class*="text"], [class*="desc"]');
-        if (contentEl) {
-          const text = (contentEl.textContent || "").trim();
-          const user = nameEl ? (nameEl.textContent || "").trim() : "";
-          if (text.length > 2 && comments.length < 1000) {
-            comments.push({ user, content: text, likes: 0 });
-          }
+        const contentEl = el.querySelector('[class*="content"], [class*="text"], [class*="desc"], [class*="body"], p');
+        const user = nameEl ? (nameEl.textContent || "").trim() : "";
+        const text = contentEl ? (contentEl.textContent || "").trim() : (el.textContent || "").trim();
+        if (text.length > 0 && comments.length < 1000) {
+          comments.push({ user, content: text, likes: 0 });
         }
       } catch (_) {}
     });
+    // 兜底：如果上面没提取到，用最宽泛的方式
     if (comments.length === 0) {
-      commentRoot.querySelectorAll('[class*="comment-content"], [class*="comment-text"]').forEach(el => {
+      commentRoot.querySelectorAll('[class*="comment-content"], [class*="comment-text"], [class*="comment-body"]').forEach(el => {
         const text = (el.textContent || "").trim();
-        if (text.length > 2 && comments.length < 1000) comments.push({ user: "", content: text, likes: 0 });
+        if (text.length > 0 && comments.length < 1000) comments.push({ user: "", content: text, likes: 0 });
       });
     }
 
