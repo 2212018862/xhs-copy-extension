@@ -13,7 +13,7 @@
   const noteQueue = [];
 
   function getMaxComments() {
-    return parseInt(localStorage.getItem("xhs_max_comments")) || 100;
+    return parseInt(localStorage.getItem("xhs_max_comments")) || 10;
   }
 
   function normalizeUrl(url) {

@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("save").addEventListener("click", () => {
     let val = parseInt(input.value) || 100;
-    if (val < 10) val = 10;
+    if (val < 1) val = 1;
     if (val > 10000) val = 10000;
     input.value = val;
     localStorage.setItem("xhs_max_comments", val);
