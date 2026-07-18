@@ -7,7 +7,10 @@
   "use strict";
 
   const BUTTON_ID = "xhs-copy-btn";
+  const ADD_BTN_ID = "xhs-add-btn";
+  const QUEUE_PANEL_ID = "xhs-queue-panel";
   const TOAST_ID = "xhs-copy-toast";
+  const noteQueue = [];
 
   function normalizeUrl(url) {
     if (!url) return "";
@@ -399,6 +402,139 @@
     return btn;
   }
 
+  // ══════════════════════════════════════════
+  //  待复制队列 + 悬浮面板
+  // ══════════════════════════════════════════
+
+  function createAddButton() {
+    const btn = document.createElement("div");
+    btn.id = ADD_BTN_ID;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>加入待复制</span>';
+    btn.style.cssText = `
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+      background: linear-gradient(135deg, #ffa502 0%, #ff6348 100%);
+      color: #fff; font-size: 14px; font-weight: 600; border: none; border-radius: 24px;
+      cursor: pointer; user-select: none; box-shadow: 0 2px 12px rgba(255,165,2,0.35);
+      transition: all 0.25s ease; z-index: 99999; position: relative; white-space: nowrap;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    `;
+    btn.addEventListener("mouseenter", () => { btn.style.transform = "translateY(-2px) scale(1.03)"; });
+    btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      showToast("⏳ 正在提取...");
+      const data = await extractNoteContent();
+      if (!data || (!data.title && !data.desc)) { showToast("⚠️ 未提取到内容", false); return; }
+      // 去重：同 URL 不重复加入
+      const exists = noteQueue.find(n => n.url === data.url);
+      if (exists) { showToast("⚠️ 该笔记已在队列中", false); return; }
+      noteQueue.push(data);
+      updateQueuePanel();
+      const title = data.title || data.desc?.substring(0, 30) || "无标题";
+      showToast(`✅ 已加入队列（${noteQueue.length}篇）: ${title}`);
+    });
+    return btn;
+  }
+
+  function updateQueuePanel() {
+    let panel = document.getElementById(QUEUE_PANEL_ID);
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = QUEUE_PANEL_ID;
+      panel.style.cssText = `
+        position: fixed; top: 60px; right: 20px; z-index: 999999;
+        width: 320px; max-height: 70vh; overflow-y: auto;
+        background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 13px; color: #333; transition: all 0.3s ease;
+      `;
+      document.body.appendChild(panel);
+    }
+    if (noteQueue.length === 0) {
+      panel.style.display = "none";
+      return;
+    }
+    panel.style.display = "block";
+    let html = `
+      <div style="padding:12px 14px;border-bottom:1px solid #eee;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
+        <span>📋 待复制列表（${noteQueue.length}篇）</span>
+        <span style="font-size:12px;color:#999;cursor:pointer;" id="xhs-queue-close">✕</span>
+      </div>
+    `;
+    noteQueue.forEach((note, i) => {
+      const title = note.title || note.desc?.substring(0, 40) || "无标题";
+      const commentCount = note.comments?.length || 0;
+      html += `
+        <div style="padding:10px 14px;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${title}">${i + 1}. ${title}</div>
+            <div style="font-size:11px;color:#999;margin-top:2px;">${note.author || ""} ${commentCount ? `· ${commentCount}条评论` : ""}</div>
+          </div>
+          <span style="cursor:pointer;color:#ccc;font-size:16px;flex-shrink:0;" class="xhs-q-del" data-idx="${i}">✕</span>
+        </div>
+      `;
+    });
+    html += `
+      <div style="padding:12px 14px;display:flex;gap:8px;">
+        <div id="xhs-batch-copy" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#ff4757,#ff6b81);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">📋 一起复制（${noteQueue.length}篇）</div>
+        <div id="xhs-queue-clear" style="padding:10px 14px;background:#f5f5f5;color:#999;border-radius:8px;cursor:pointer;font-size:13px;">清空</div>
+      </div>
+    `;
+    panel.innerHTML = html;
+
+    // 关闭按钮
+    panel.querySelector("#xhs-queue-close")?.addEventListener("click", () => { panel.style.display = "none"; });
+    // 删除单条
+    panel.querySelectorAll(".xhs-q-del").forEach(el => {
+      el.addEventListener("click", () => {
+        const idx = parseInt(el.dataset.idx);
+        noteQueue.splice(idx, 1);
+        updateQueuePanel();
+        showToast(`🗑️ 已移除，剩余${noteQueue.length}篇`);
+      });
+    });
+    // 一起复制
+    panel.querySelector("#xhs-batch-copy")?.addEventListener("click", async () => {
+      const allData = noteQueue.map(n => {
+        const obj = {};
+        if (n.title) obj["标题"] = n.title;
+        if (n.desc) obj["正文"] = n.desc;
+        if (n.author) obj["作者"] = n.author;
+        if (n.tags?.length) obj["话题标签"] = n.tags;
+        if (n.images?.length) obj["图片"] = n.images;
+        if (n.videoUrl) obj["视频"] = n.videoUrl;
+        if (n.comments?.length) {
+          obj["评论"] = n.comments.map(c => ({
+            ...(c.user ? { "用户": c.user } : {}),
+            "内容": c.content,
+            ...(c.likes > 0 ? { "赞": c.likes } : {})
+          }));
+        }
+        if (n.url) obj["链接"] = n.url;
+        return obj;
+      });
+      const text = JSON.stringify(allData, null, 2);
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(`✅ 已复制${noteQueue.length}篇笔记到剪贴板！`);
+      } catch {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text; ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
+          document.body.appendChild(ta); ta.select(); document.execCommand("copy");
+          document.body.removeChild(ta);
+          showToast(`✅ 已复制${noteQueue.length}篇笔记到剪贴板！`);
+        } catch { showToast("❌ 复制失败", false); }
+      }
+    });
+    // 清空
+    panel.querySelector("#xhs-queue-clear")?.addEventListener("click", () => {
+      noteQueue.length = 0;
+      updateQueuePanel();
+      showToast("🗑️ 队列已清空");
+    });
+  }
+
   function showToast(text, success = true) {
     let toast = document.getElementById(TOAST_ID);
     if (!toast) {
@@ -451,6 +587,7 @@
     const wrapper = document.createElement("div");
     wrapper.style.cssText = "display:flex;gap:8px;align-items:center;margin:12px 0 0 0;flex-wrap:wrap;";
     wrapper.appendChild(createButton());
+    wrapper.appendChild(createAddButton());
     anchor.parentNode.insertBefore(wrapper, anchor.nextSibling);
 
     return true;
