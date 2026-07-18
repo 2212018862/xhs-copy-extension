@@ -231,12 +231,56 @@
   }
 
   // ══════════════════════════════════════════
+  //  自动滚动评论区，触发懒加载
+  // ══════════════════════════════════════════
+
+  async function scrollToLoadComments(maxCount = 1000) {
+    // 找到评论区滚动容器
+    const container = document.querySelector("#noteContainer, .note-container");
+    if (!container) return;
+
+    // 尝试找评论区的滚动容器（通常是可滚动的父元素）
+    const commentSection = container.querySelector('[class*="comment-list"], [class*="comments-container"], [class*="comment-inner"], [class*="note-scroller"]');
+    // 如果找不到专门的评论容器，用主容器
+    const scrollTarget = commentSection || container;
+
+    let prevCount = 0;
+    let staleRounds = 0;
+    const MAX_STALE = 3; // 连续3次没新内容就停止
+
+    for (let i = 0; i < 200; i++) { // 最多滚动200次
+      // 统计当前评论数
+      const comments = container.querySelectorAll('[class*="comment-item"]');
+      const currentCount = comments.length;
+
+      if (currentCount >= maxCount) break;
+
+      if (currentCount === prevCount) {
+        staleRounds++;
+        if (staleRounds >= MAX_STALE) break; // 没有新评论了
+      } else {
+        staleRounds = 0;
+      }
+      prevCount = currentCount;
+
+      // 滚动到底部
+      scrollTarget.scrollTop = scrollTarget.scrollHeight;
+
+      // 等待加载（给异步请求时间）
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  // ══════════════════════════════════════════
   //  统一入口
   // ══════════════════════════════════════════
 
   let cachedData = null;
 
   async function extractNoteContent() {
+    // 先滚动评论区加载全部评论
+    await scrollToLoadComments(1000);
+
     const pageUrl = window.location.href;
     const pageNoteId = (location.pathname.match(/\/explore\/([^/?#]+)/) || [])[1] || "";
 
@@ -293,6 +337,7 @@
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>一键复制</span>';
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      showToast("⏳ 正在加载评论...");
       const data = await extractNoteContent();
       const text = buildCopyText(data);
       if (!text) { showToast("⚠️ 未能提取笔记内容", false); return; }
