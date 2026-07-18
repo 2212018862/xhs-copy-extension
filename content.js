@@ -399,12 +399,32 @@
 
   function showToast(text, success = true) {
     let toast = document.getElementById(TOAST_ID);
-    if (!toast) { toast = document.createElement("div"); toast.id = TOAST_ID; document.body.appendChild(toast); }
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = TOAST_ID;
+      // 内联样式兜底，确保不依赖外部 CSS
+      toast.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+        padding: 14px 28px; border-radius: 12px; font-size: 15px; font-weight: 500;
+        color: #fff; z-index: 999999; pointer-events: none; opacity: 0;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        background: linear-gradient(135deg, #2ed573 0%, #7bed9f 100%);
+      `;
+      document.body.appendChild(toast);
+    }
     toast.textContent = text;
-    toast.className = success ? "xhs-copy-toast xhs-copy-success" : "xhs-copy-toast xhs-copy-error";
-    toast.classList.add("xhs-copy-show");
+    toast.style.background = success
+      ? "linear-gradient(135deg, #2ed573 0%, #7bed9f 100%)"
+      : "linear-gradient(135deg, #ff4757 0%, #ff6b81 100%)";
+    toast.style.opacity = "1";
+    toast.style.transform = "translate(-50%, -50%) scale(1)";
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => toast.classList.remove("xhs-copy-show"), 2500);
+    toast._timer = setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translate(-50%, -50%) scale(0.8)";
+    }, 8000);
   }
 
   // ══════════════════════════════════════════
