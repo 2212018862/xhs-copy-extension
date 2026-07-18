@@ -208,21 +208,19 @@
     const noteType = videoEl ? "video" : "normal";
     const comments = [];
 
-    // ★ 评论可能不在 #noteContainer 里，动态找包含 comment-item 的容器
-    let commentRoot = container;
-    if (!container.querySelector('[class*="comment-item"]')) {
-      // container 里没有评论，找真正的评论容器
-      document.querySelectorAll('*').forEach(el => {
-        if (commentRoot !== container) return;
-        const style = getComputedStyle(el);
-        if ((style.overflow === 'auto' || style.overflow === 'scroll' ||
-             style.overflowY === 'auto' || style.overflowY === 'scroll') &&
-            el.scrollHeight > el.clientHeight + 10 &&
-            el.querySelectorAll('[class*="comment-item"]').length > 0) {
-          commentRoot = el;
-        }
-      });
-    }
+    // ★ 评论容器：强制动态检测（不信任 #noteContainer）
+    let commentRoot = null;
+    document.querySelectorAll('*').forEach(el => {
+      if (commentRoot) return;
+      const style = getComputedStyle(el);
+      if ((style.overflow === 'auto' || style.overflow === 'scroll' ||
+           style.overflowY === 'auto' || style.overflowY === 'scroll') &&
+          el.scrollHeight > el.clientHeight + 10 &&
+          el.querySelectorAll('[class*="comment-item"]').length > 0) {
+        commentRoot = el;
+      }
+    });
+    if (!commentRoot) commentRoot = container; // 最后兜底
 
     commentRoot.querySelectorAll('[class*="comment-item"]').forEach(el => {
       try {
