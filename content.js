@@ -476,7 +476,7 @@
   function createAddButton() {
     const btn = document.createElement("div");
     btn.id = ADD_BTN_ID;
-    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>加入待复制</span>';
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>加入待提取</span>';
     btn.style.cssText = `
       display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
       background: linear-gradient(135deg, #ffa502 0%, #ff6348 100%);
@@ -524,7 +524,7 @@
     panel.style.display = "block";
     let html = `
       <div style="padding:12px 14px;border-bottom:1px solid #eee;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
-        <span>📋 待复制列表（${noteQueue.length}篇）</span>
+        <span>📋 待提取列表（${noteQueue.length}篇）</span>
         <span style="font-size:12px;color:#999;cursor:pointer;" id="xhs-queue-close">✕</span>
       </div>
     `;
@@ -544,7 +544,7 @@
     html += `
       <div style="padding:12px 14px;display:flex;gap:8px;">
         <div id="xhs-batch-copy" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#ff4757,#ff6b81);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">📋 一起复制（${noteQueue.length}篇）</div>
-        <div id="xhs-batch-dl" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#2ed573,#7bed9f);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">💾 一起下载</div>
+        <div id="xhs-batch-dl" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#2ed573,#7bed9f);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">💾 一起下载（${noteQueue.length}篇）</div>
         <div id="xhs-queue-clear" style="padding:10px 14px;background:#f5f5f5;color:#999;border-radius:8px;cursor:pointer;font-size:13px;">清空</div>
       </div>
     `;
