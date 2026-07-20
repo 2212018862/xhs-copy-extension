@@ -377,8 +377,27 @@
   }
 
   // ══════════════════════════════════════════
+  //  下载 JSON 文件
+  // ══════════════════════════════════════════
+
+  function downloadJson(data, filename) {
+    const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ══════════════════════════════════════════
   //  UI：按钮 + Toast
   // ══════════════════════════════════════════
+
+  const DL_BTN_ID = "xhs-dl-btn";
 
   function createButton() {
     const btn = document.createElement("div");
@@ -404,6 +423,48 @@
           showToast(`✅ 已复制！${commentCount ? `含${commentCount}条评论 · ` : ''}via ${data.source}`);
         } catch { showToast("❌ 复制失败", false); }
       }
+    });
+    return btn;
+  }
+
+  function createDownloadButton() {
+    const btn = document.createElement("div");
+    btn.id = DL_BTN_ID;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>一键下载</span>';
+    btn.style.cssText = `
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px;
+      background: linear-gradient(135deg, #2ed573 0%, #7bed9f 100%);
+      color: #fff; font-size: 14px; font-weight: 600; border: none; border-radius: 24px;
+      cursor: pointer; user-select: none; box-shadow: 0 2px 12px rgba(46,213,115,0.35);
+      transition: all 0.25s ease; z-index: 99999; position: relative; white-space: nowrap;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    `;
+    btn.addEventListener("mouseenter", () => { btn.style.transform = "translateY(-2px) scale(1.03)"; });
+    btn.addEventListener("mouseleave", () => { btn.style.transform = ""; });
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      showToast("⏳ 正在提取...");
+      const data = await extractNoteContent();
+      if (!data || (!data.title && !data.desc)) { showToast("⚠️ 未提取到内容", false); return; }
+      const obj = {};
+      if (data.title) obj["标题"] = data.title;
+      if (data.desc) obj["正文"] = data.desc;
+      if (data.author) obj["作者"] = data.author;
+      if (data.tags?.length) obj["话题标签"] = data.tags;
+      if (data.images?.length) obj["图片"] = data.images;
+      if (data.videoUrl) obj["视频"] = data.videoUrl;
+      if (data.comments?.length) {
+        obj["评论"] = data.comments.map(c => ({
+          ...(c.user ? { "用户": c.user } : {}),
+          "内容": c.content,
+          ...(c.likes > 0 ? { "赞": c.likes } : {})
+        }));
+      }
+      if (data.url) obj["链接"] = data.url;
+      const title = data.title || data.desc?.substring(0, 20) || "笔记";
+      const safeName = title.replace(/[\\/:*?"<>|]/g, "_").substring(0, 50);
+      downloadJson(obj, `小红书_${safeName}.json`);
+      showToast(`✅ 已下载：${safeName}.json`);
     });
     return btn;
   }
@@ -483,6 +544,7 @@
     html += `
       <div style="padding:12px 14px;display:flex;gap:8px;">
         <div id="xhs-batch-copy" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#ff4757,#ff6b81);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">📋 一起复制（${noteQueue.length}篇）</div>
+        <div id="xhs-batch-dl" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#2ed573,#7bed9f);color:#fff;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">💾 一起下载</div>
         <div id="xhs-queue-clear" style="padding:10px 14px;background:#f5f5f5;color:#999;border-radius:8px;cursor:pointer;font-size:13px;">清空</div>
       </div>
     `;
@@ -532,6 +594,30 @@
           showToast(`✅ 已复制${noteQueue.length}篇笔记到剪贴板！`);
         } catch { showToast("❌ 复制失败", false); }
       }
+    });
+    // 一起下载
+    panel.querySelector("#xhs-batch-dl")?.addEventListener("click", () => {
+      const allData = noteQueue.map(n => {
+        const obj = {};
+        if (n.title) obj["标题"] = n.title;
+        if (n.desc) obj["正文"] = n.desc;
+        if (n.author) obj["作者"] = n.author;
+        if (n.tags?.length) obj["话题标签"] = n.tags;
+        if (n.images?.length) obj["图片"] = n.images;
+        if (n.videoUrl) obj["视频"] = n.videoUrl;
+        if (n.comments?.length) {
+          obj["评论"] = n.comments.map(c => ({
+            ...(c.user ? { "用户": c.user } : {}),
+            "内容": c.content,
+            ...(c.likes > 0 ? { "赞": c.likes } : {})
+          }));
+        }
+        if (n.url) obj["链接"] = n.url;
+        return obj;
+      });
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").substring(0, 19);
+      downloadJson(allData, `小红书_批量_${noteQueue.length}篇_${ts}.json`);
+      showToast(`✅ 已下载${noteQueue.length}篇笔记`);
     });
     // 清空
     panel.querySelector("#xhs-queue-clear")?.addEventListener("click", () => {
@@ -593,6 +679,7 @@
     const wrapper = document.createElement("div");
     wrapper.style.cssText = "display:flex;gap:8px;align-items:center;margin:12px 0 0 0;flex-wrap:wrap;";
     wrapper.appendChild(createButton());
+    wrapper.appendChild(createDownloadButton());
     wrapper.appendChild(createAddButton());
     anchor.parentNode.insertBefore(wrapper, anchor.nextSibling);
 
