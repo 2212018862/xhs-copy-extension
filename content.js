@@ -11,6 +11,7 @@
   const QUEUE_PANEL_ID = "xhs-queue-panel";
   const TOAST_ID = "xhs-copy-toast";
   const noteQueue = [];
+  let panelCollapsed = false;
   let maxComments = 10;
 
   // 从 chrome.storage 读取配置（扩展内共享）
@@ -522,12 +523,14 @@
       return;
     }
     panel.style.display = "block";
+    const arrow = panelCollapsed ? "▶" : "▼";
     let html = `
-      <div style="padding:12px 14px;border-bottom:1px solid #eee;font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="padding:12px 14px;border-bottom:${panelCollapsed ? 'none' : '1px solid #eee'};font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;" id="xhs-queue-toggle">
         <span>📋 待提取列表（${noteQueue.length}篇）</span>
-        <span style="font-size:12px;color:#999;cursor:pointer;" id="xhs-queue-close">✕</span>
+        <span style="font-size:12px;color:#999;">${arrow}</span>
       </div>
     `;
+    if (!panelCollapsed) {
     noteQueue.forEach((note, i) => {
       const title = note.title || note.desc?.substring(0, 40) || "无标题";
       const commentCount = note.comments?.length || 0;
@@ -548,10 +551,14 @@
         <div id="xhs-queue-clear" style="padding:10px 14px;background:#f5f5f5;color:#999;border-radius:8px;cursor:pointer;font-size:13px;">清空</div>
       </div>
     `;
+    } // end if (!panelCollapsed)
     panel.innerHTML = html;
 
-    // 关闭按钮
-    panel.querySelector("#xhs-queue-close")?.addEventListener("click", () => { panel.style.display = "none"; });
+    // 收起/展开切换
+    panel.querySelector("#xhs-queue-toggle")?.addEventListener("click", () => {
+      panelCollapsed = !panelCollapsed;
+      updateQueuePanel();
+    });
     // 删除单条
     panel.querySelectorAll(".xhs-q-del").forEach(el => {
       el.addEventListener("click", () => {
