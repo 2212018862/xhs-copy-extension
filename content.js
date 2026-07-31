@@ -746,6 +746,9 @@
       // 已经加过按钮的跳过
       if (link.querySelector(".xhs-card-extract")) return;
 
+      // 取完整 URL（含 xsec_token 等参数）
+      const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+
       // 找卡片容器
       let card = link;
       for (let i = 0; i < 5; i++) {
@@ -773,7 +776,7 @@
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        const noteUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+        const noteUrl = fullUrl;
 
         // 去重
         if (noteQueue.find(n => n.url?.includes(noteId))) {
