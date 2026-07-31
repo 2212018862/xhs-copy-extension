@@ -52,8 +52,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const scriptEnd = html.indexOf("</script>", start);
         if (scriptEnd === -1) { sendResponse({ data: null }); return; }
         let stateStr = html.substring(start, scriptEnd).trim();
-        // 去掉末尾可能的分号
         if (stateStr.endsWith(";")) stateStr = stateStr.slice(0, -1);
+        // 预处理：SSR 可能包含 JS 值（undefined, NaN, Infinity），不是合法 JSON
+        stateStr = stateStr.replace(/:\s*undefined\b/g, ": null");
+        stateStr = stateStr.replace(/:\s*NaN\b/g, ": null");
+        stateStr = stateStr.replace(/:\s*Infinity\b/g, ": null");
+        stateStr = stateStr.replace(/:\s*-Infinity\b/g, ": null");
         try {
           const state = JSON.parse(stateStr);
           const noteDetailMap = state?.note?.noteDetailMap || {};
