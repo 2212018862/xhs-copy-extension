@@ -730,37 +730,13 @@
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
-    // 注入 script 标签到页面，在 MAIN 世界读 __INITIAL_STATE__
-    if (!document.getElementById("xhs-profile-data")) {
-      const script = document.createElement("script");
-      script.id = "xhs-profile-data";
-      script.textContent = `
-        (function() {
-          var notes = window.__INITIAL_STATE__?.user?.notes;
-          var raw = notes?._rawValue || notes?._value || notes;
-          if (raw && Array.isArray(raw[0])) {
-            window.__XHS_PROFILE_NOTES__ = raw[0].map(function(n) {
-              return {
-                id: n.id,
-                noteId: n.noteCard?.noteId,
-                title: n.noteCard?.displayTitle || "",
-                author: n.noteCard?.user?.nickname || "",
-                type: n.noteCard?.type || "normal",
-                cover: n.noteCard?.cover?.urlDefault || n.noteCard?.cover?.url || "",
-                xsecToken: n.xsecToken || "",
-              };
-            });
-          }
-        })();
-      `;
-      document.head.appendChild(script);
-    }
-
-    // 等一小会儿让 script 执行，然后从 window 读数据
-    const noteList = window.__XHS_PROFILE_NOTES__;
-    if (!noteList || noteList.length === 0) return;
-
-    injectProfileButtonsInternal(noteList);
+    // 通过 background service worker 在 MAIN 世界读 Vue 数据
+    chrome.runtime.sendMessage({ action: "getProfileNotes" }, (response) => {
+      const noteList = response?.notes;
+      if (!noteList || noteList.length === 0) return;
+      console.log("[XHS-Copy] got", noteList.length, "notes from background");
+      injectProfileButtonsInternal(noteList);
+    });
   }
 
   function injectProfileButtonsInternal(noteList) {
