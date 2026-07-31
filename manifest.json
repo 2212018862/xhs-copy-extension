@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "在小红书笔记详情页添加一键复制按钮，快速复制笔记标题、正文、标签和作者",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "host_permissions": [
     "https://www.xiaohongshu.com/*"
   ],

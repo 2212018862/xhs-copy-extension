@@ -796,14 +796,19 @@
   // 后台标签页提取：开新标签 → 等加载 → 提取 → 关标签
   function extractViaBackgroundTab(url) {
     return new Promise((resolve, reject) => {
-      chrome.tabs.create({ url, active: false }, (tab) => {
-        const tabId = tab.id;
+      // 通过 background service worker 开后台标签页
+      chrome.runtime.sendMessage({ action: "openTab", url }, (response) => {
+        if (chrome.runtime.lastError || !response?.tabId) {
+          reject(chrome.runtime.lastError || new Error("failed to open tab"));
+          return;
+        }
+        const tabId = response.tabId;
         let resolved = false;
 
         const cleanup = () => {
           if (!resolved) {
             resolved = true;
-            try { chrome.tabs.remove(tabId); } catch (_) {}
+            chrome.runtime.sendMessage({ action: "closeTab", tabId });
           }
         };
 
