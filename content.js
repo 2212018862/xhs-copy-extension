@@ -787,16 +787,14 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
 
-      // 点击：通过 background fetch 完整笔记数据
+      // 点击：后台开标签页提取完整笔记数据
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        // 用作者主页卡片链接的完整 URL（含 xsec_token）
         const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
 
-        // 去重
         if (noteQueue.find(n => n.url?.includes(noteId))) {
           showToast("⚠️ 该笔记已在队列中", false);
           return;
@@ -806,21 +804,86 @@
         btn.style.background = "rgba(0,0,0,0.5)";
 
         try {
+          // 获取当前 tab ID 作为 openerTabId
+          const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          const openerTabId = currentTab?.id;
+
           const response = await new Promise((resolve) => {
             try {
-              chrome.runtime.sendMessage({ action: "fetchNote", url: noteUrl }, (resp) => {
-                if (chrome.runtime.lastError) { resolve({ data: null }); return; }
+              chrome.runtime.sendMessage({ action: "openTab", url: noteUrl, openerTabId }, (resp) => {
+                if (chrome.runtime.lastError) { resolve({ tabId: null }); return; }
                 resolve(resp);
               });
-            } catch (_) { resolve({ data: null }); }
+            } catch (_) { resolve({ tabId: null }); }
           });
-          const data = response?.data;
-          if (data && (data.title || data.desc)) {
+
+          if (!response?.tabId) {
+            showToast("❌ 打开标签页失败", false);
+            btn.textContent = "➕ 待提取";
+            btn.style.background = "rgba(255,165,2,0.9)";
+            return;
+          }
+
+          const tabId = response.tabId;
+
+          // 等页面加载 + 渲染
+          await new Promise(r => setTimeout(r, 4000));
+
+          // 在后台标签页执行提取
+          const extractResult = await new Promise((resolve) => {
+            try {
+              chrome.scripting.executeScript({
+                target: { tabId },
+                world: "MAIN",
+                func: () => {
+                  try {
+                    const state = window.__INITIAL_STATE__;
+                    const noteDetailMap = state?.note?.noteDetailMap || {};
+                    const noteId = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
+                    if (!noteId) return null;
+                    const detail = noteDetailMap[noteId];
+                    if (!detail) return null;
+                    const note = detail?.note && typeof detail.note === "object" ? detail.note : detail;
+                    if (!note) return null;
+                    const foundNoteId = detail?.note?.noteId || detail?.noteId;
+                    if (foundNoteId && foundNoteId !== noteId) return null;
+                    const title = note?.title || "";
+                    const desc = note?.desc || "";
+                    const author = note?.user?.nickname || "";
+                    const tags = (note?.tagList || []).map(t => t?.name).filter(Boolean);
+                    const images = (note?.imageList || []).map(img => {
+                      const url = img?.urlDefault || img?.urlPre || img?.url || "";
+                      return url.startsWith("//") ? "https:" + url : url;
+                    }).filter(Boolean);
+                    let videoUrl = "";
+                    const streams = note?.video?.media?.stream;
+                    if (streams) {
+                      const h264 = streams.h264 || streams.h265 || [];
+                      if (h264.length > 0) videoUrl = h264[0].masterUrl || "";
+                    }
+                    const comments = [];
+                    const commentMap = state?.comment?.commentMap || {};
+                    for (const c of Object.values(commentMap)) {
+                      if (c.content) comments.push({ user: c.userInfo?.nickname || "", content: c.content, likes: c.likeCount || 0 });
+                    }
+                    return { title, desc, author, tags, images, videoUrl, noteType: (note?.type || "").toLowerCase(), comments, url: location.href };
+                  } catch (e) { return null; }
+                }
+              }).then(results => {
+                resolve(results?.[0]?.result || null);
+              }).catch(() => resolve(null));
+            } catch (_) { resolve(null); }
+          });
+
+          // 关闭标签页
+          chrome.runtime.sendMessage({ action: "closeTab", tabId });
+
+          if (extractResult && (extractResult.title || extractResult.desc)) {
             if (!noteQueue.find(n => n.url?.includes(noteId))) {
-              noteQueue.push(data);
+              noteQueue.push(extractResult);
             }
             updateQueuePanel();
-            showToast(`✅ 已加入队列：${data.title || "无标题"}`);
+            showToast(`✅ 已加入队列：${extractResult.title || "无标题"}`);
             btn.textContent = "✅ 已提取";
             btn.style.background = "rgba(46,213,115,0.9)";
           } else {
@@ -829,7 +892,7 @@
             btn.style.background = "rgba(255,165,2,0.9)";
           }
         } catch (err) {
-          console.error("[XHS-Copy] fetchNote failed:", noteUrl, err);
+          console.error("[XHS-Copy] extract failed:", err);
           showToast("❌ 提取失败", false);
           btn.textContent = "➕ 待提取";
           btn.style.background = "rgba(255,165,2,0.9)";
