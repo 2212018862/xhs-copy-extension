@@ -724,8 +724,12 @@
   //  作者主页：批量提取笔记
   // ══════════════════════════════════════════
 
+  let profileTimer = null;
   function injectProfileButtons() {
     if (!/\/user\/profile\//.test(location.href)) return;
+    // 节流：避免 MutationObserver 频繁触发
+    if (profileTimer) return;
+    profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
     // 找所有笔记卡片链接（去重）
     const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
@@ -742,9 +746,13 @@
       // 已经加过按钮的跳过
       if (link.querySelector(".xhs-card-extract")) return;
 
-      // 找卡片容器（往上找，直到找到有 position:relative 的父元素）
-      const card = link.closest('[style*="position"]') || link.parentElement;
-      if (!card) return;
+      // 找卡片容器
+      let card = link;
+      for (let i = 0; i < 5; i++) {
+        if (!card.parentElement) break;
+        card = card.parentElement;
+        if (getComputedStyle(card).position !== "static") break;
+      }
 
       // 创建按钮
       const btn = document.createElement("div");
