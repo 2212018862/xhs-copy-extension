@@ -788,7 +788,8 @@
         e.stopPropagation();
         e.stopImmediatePropagation();
 
-        const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+        // 用简单 URL 格式（不带 xsec_token，避免 token 失效）
+        const noteUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
 
         // 去重
         if (noteQueue.find(n => n.url?.includes(noteId))) {
