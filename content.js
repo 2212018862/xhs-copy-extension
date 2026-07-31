@@ -787,7 +787,7 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
 
-      // 点击：window.open 在新标签页打开（跟右键行为一致）
+      // 点击：后台标签页提取完整数据（用完整URL含token）
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -804,71 +804,45 @@
         btn.style.background = "rgba(0,0,0,0.5)";
 
         try {
-          // 用 window.open 开新标签页（保留 referer）
           const newTab = window.open(noteUrl, "_blank");
-          if (!newTab) {
-            showToast("❌ 弹窗被阻止，请允许弹窗", false);
-            btn.textContent = "➕ 待提取";
-            btn.style.background = "rgba(255,165,2,0.9)";
-            return;
-          }
+          if (!newTab) { showToast("❌ 弹窗被阻止", false); btn.textContent = "➕ 待提取"; btn.style.background = "rgba(255,165,2,0.9)"; return; }
 
-          // 等页面加载
           await new Promise(r => setTimeout(r, 4000));
 
-          // 尝试从新标签页提取数据
+          // 找到新标签页
+          const tabs = await chrome.tabs.query({ url: `*://*/explore/${noteId}*` });
+          const newTabInfo = tabs?.[tabs.length - 1];
           let extractResult = null;
-          try {
-            extractResult = newTab.__XHS_NOTE_DATA__;
-          } catch (_) {
-            // 跨域访问不了，用 background 的 scripting API
-          }
 
-          // 如果 window.open 拿不到数据，用 chrome.scripting
-          if (!extractResult) {
-            // 找到新标签页的 tabId
-            const tabs = await chrome.tabs.query({ url: noteUrl });
-            const newTabInfo = tabs?.find(t => t.url?.includes(noteId));
-            if (newTabInfo?.id) {
-              extractResult = await new Promise((resolve) => {
-                try {
-                  chrome.scripting.executeScript({
-                    target: { tabId: newTabInfo.id },
-                    world: "MAIN",
-                    func: () => {
-                      try {
-                        const state = window.__INITIAL_STATE__;
-                        const map = state?.note?.noteDetailMap || {};
-                        const id = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
-                        if (!id || !map[id]) return null;
-                        const d = map[id];
-                        const n = d?.note && typeof d.note === "object" ? d.note : d;
-                        if (!n) return null;
-                        if (d?.note?.noteId && d.note.noteId !== id) return null;
-                        const imgs = (n.imageList || []).map(i => { const u = i?.urlDefault || i?.urlPre || i?.url || ""; return u.startsWith("//") ? "https:" + u : u; }).filter(Boolean);
-                        let vid = "";
-                        const s = n?.video?.media?.stream;
-                        if (s) { const h = s.h264 || s.h265 || []; if (h.length > 0) vid = h[0].masterUrl || ""; }
-                        const cmts = [];
-                        const cm = state?.comment?.commentMap || {};
-                        for (const c of Object.values(cm)) { if (c.content) cmts.push({ user: c.userInfo?.nickname || "", content: c.content, likes: c.likeCount || 0 }); }
-                        return { title: n?.title || "", desc: n?.desc || "", author: n?.user?.nickname || "", tags: (n?.tagList || []).map(t => t?.name).filter(Boolean), images: imgs, videoUrl: vid, noteType: (n?.type || "").toLowerCase(), comments: cmts, url: location.href };
-                      } catch (e) { return null; }
-                    }
-                  }).then(r => resolve(r?.[0]?.result || null)).catch(() => resolve(null));
-                } catch (_) { resolve(null); }
-              });
-              // 关闭标签页
-              chrome.tabs.remove(newTabInfo.id).catch(() => {});
-            }
+          if (newTabInfo?.id) {
+            extractResult = await new Promise((resolve) => {
+              try {
+                chrome.scripting.executeScript({
+                  target: { tabId: newTabInfo.id }, world: "MAIN",
+                  func: () => {
+                    try {
+                      const state = window.__INITIAL_STATE__;
+                      const map = state?.note?.noteDetailMap || {};
+                      const id = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
+                      if (!id || !map[id]) return null;
+                      const d = map[id]; const n = d?.note && typeof d.note === "object" ? d.note : d;
+                      if (!n || (d?.note?.noteId && d.note.noteId !== id)) return null;
+                      const imgs = (n.imageList||[]).map(i=>{const u=i?.urlDefault||i?.urlPre||i?.url||"";return u.startsWith("//")?"https:"+u:u}).filter(Boolean);
+                      let vid=""; const s=n?.video?.media?.stream; if(s){const h=s.h264||s.h265||[];if(h.length>0)vid=h[0].masterUrl||"";}
+                      const c=[]; const cm=state?.comment?.commentMap||{}; for(const v of Object.values(cm)){if(v.content)c.push({user:v.userInfo?.nickname||"",content:v.content,likes:v.likeCount||0});}
+                      return {title:n?.title||"",desc:n?.desc||"",author:n?.user?.nickname||"",tags:(n?.tagList||[]).map(t=>t?.name).filter(Boolean),images:imgs,videoUrl:vid,noteType:(n?.type||"").toLowerCase(),comments:c,url:location.href};
+                    } catch(e){return null;}
+                  }
+                }).then(r=>resolve(r?.[0]?.result||null)).catch(()=>resolve(null));
+              } catch(_){resolve(null);}
+            });
+            chrome.tabs.remove(newTabInfo.id).catch(()=>{});
           }
 
           if (extractResult && (extractResult.title || extractResult.desc)) {
-            if (!noteQueue.find(n => n.url?.includes(noteId))) {
-              noteQueue.push(extractResult);
-            }
+            noteQueue.push(extractResult);
             updateQueuePanel();
-            showToast(`✅ 已加入队列：${extractResult.title || "无标题"}`);
+            showToast(`✅ 已加入：${extractResult.title || "无标题"}`);
             btn.textContent = "✅ 已提取";
             btn.style.background = "rgba(46,213,115,0.9)";
           } else {
@@ -877,7 +851,7 @@
             btn.style.background = "rgba(255,165,2,0.9)";
           }
         } catch (err) {
-          console.error("[XHS-Copy] extract failed:", err);
+          console.error("[XHS-Copy]", err);
           showToast("❌ 提取失败", false);
           btn.textContent = "➕ 待提取";
           btn.style.background = "rgba(255,165,2,0.9)";
