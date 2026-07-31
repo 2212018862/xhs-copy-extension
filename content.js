@@ -798,6 +798,7 @@
         e.stopImmediatePropagation();
 
         const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+        console.log("[XHS-Copy] noteUrl:", noteUrl, "href:", href, "noteId:", noteId);
 
         if (noteQueue.find(n => n.url?.includes(noteId))) {
           showToast("⚠️ 该笔记已在队列中", false); return;
