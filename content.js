@@ -730,22 +730,46 @@
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
-    console.log("[XHS-Copy] injectProfileButtons called");
+    // 获取当前 tab ID
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs?.[0]?.id) return;
+      const tabId = tabs[0].id;
 
-    // 从 __INITIAL_STATE__ 提取笔记列表
-    const notes = window.__INITIAL_STATE__?.user?.notes;
-    const raw = notes?._rawValue || notes?._value || notes;
-    if (!raw || !Array.isArray(raw[0])) {
-      console.log("[XHS-Copy] no note list found", { raw: !!raw, isArray: Array.isArray(raw?.[0]) });
-      return;
-    }
+      // 在 MAIN 世界执行才能访问 Vue 响应式状态
+      chrome.scripting.executeScript({
+        target: { tabId },
+        world: "MAIN",
+        func: () => {
+        const notes = window.__INITIAL_STATE__?.user?.notes;
+        const raw = notes?._rawValue || notes?._value || notes;
+        if (!raw || !Array.isArray(raw[0])) return null;
+        return raw[0].map(n => ({
+          id: n.id,
+          noteId: n.noteCard?.noteId,
+          title: n.noteCard?.displayTitle || "",
+          author: n.noteCard?.user?.nickname || "",
+          type: n.noteCard?.type || "normal",
+          cover: n.noteCard?.cover?.urlDefault || n.noteCard?.cover?.url || "",
+          xsecToken: n.xsecToken || "",
+        }));
+      }
+    }).then(results => {
+      const noteList = results?.[0]?.result;
+      if (!noteList || noteList.length === 0) {
+        console.log("[XHS-Copy] no note list from MAIN world");
+        return;
+      }
+      console.log("[XHS-Copy] got", noteList.length, "notes from MAIN world");
+      injectProfileButtonsInternal(noteList);
+    }).catch(err => {
+      console.error("[XHS-Copy] executeScript failed:", err);
+    });
+    }); // chrome.tabs.query
+  }
 
-    const noteList = raw[0];
-    console.log("[XHS-Copy] found", noteList.length, "notes in __INITIAL_STATE__");
-
+  function injectProfileButtonsInternal(noteList) {
     // 找所有笔记卡片链接
     const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
-    console.log("[XHS-Copy] found", noteLinks.length, "note links in DOM");
     const processed = new Set();
 
     noteLinks.forEach(link => {
@@ -757,14 +781,13 @@
       processed.add(noteId);
       if (link.querySelector(".xhs-card-extract")) return;
 
-      // 从 __INITIAL_STATE__ 找对应笔记数据
-      const noteItem = noteList.find(n => n.id === noteId || n.noteCard?.noteId === noteId);
+      // 从 noteList 找对应数据
+      const noteItem = noteList.find(n => n.id === noteId || n.noteId === noteId);
       if (!noteItem) return;
 
-      const card = noteItem.noteCard || {};
-      const title = card.displayTitle || "";
-      const author = card.user?.nickname || "";
-      const noteType = card.type || "normal";
+      const title = noteItem.title;
+      const author = noteItem.author;
+      const noteType = noteItem.type;
 
       // 找卡片容器
       let cardEl = link;
@@ -802,14 +825,9 @@
         // 构建笔记数据
         const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
         const data = {
-          title: title,
-          desc: "",
-          author: author,
-          tags: [],
-          images: card.cover ? [card.cover.urlDefault || card.cover.url || ""] : [],
-          videoUrl: "",
-          noteType: noteType,
-          comments: [],
+          title, desc: "", author, tags: [],
+          images: noteItem.cover ? [noteItem.cover] : [],
+          videoUrl: "", noteType, comments: [],
           url: noteUrl,
         };
 
