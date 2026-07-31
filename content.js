@@ -731,12 +731,17 @@
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
     // 通过 background service worker 在 MAIN 世界读 Vue 数据
-    chrome.runtime.sendMessage({ action: "getProfileNotes" }, (response) => {
-      const noteList = response?.notes;
-      if (!noteList || noteList.length === 0) return;
-      console.log("[XHS-Copy] got", noteList.length, "notes from background");
-      injectProfileButtonsInternal(noteList);
-    });
+    try {
+      chrome.runtime.sendMessage({ action: "getProfileNotes" }, (response) => {
+        if (chrome.runtime.lastError) return; // 上下文失效，静默忽略
+        const noteList = response?.notes;
+        if (!noteList || noteList.length === 0) return;
+        console.log("[XHS-Copy] got", noteList.length, "notes from background");
+        injectProfileButtonsInternal(noteList);
+      });
+    } catch (_) {
+      // 扩展上下文已失效，忽略
+    }
   }
 
   function injectProfileButtonsInternal(noteList) {
@@ -802,7 +807,12 @@
 
         try {
           const response = await new Promise((resolve) => {
-            chrome.runtime.sendMessage({ action: "fetchNote", url: noteUrl }, resolve);
+            try {
+              chrome.runtime.sendMessage({ action: "fetchNote", url: noteUrl }, (resp) => {
+                if (chrome.runtime.lastError) { resolve({ data: null }); return; }
+                resolve(resp);
+              });
+            } catch (_) { resolve({ data: null }); }
           });
           const data = response?.data;
           if (data && (data.title || data.desc)) {
