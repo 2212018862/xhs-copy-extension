@@ -800,53 +800,27 @@
         const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
 
         if (noteQueue.find(n => n.url?.includes(noteId))) {
-          showToast("⚠️ 该笔记已在队列中", false);
-          return;
+          showToast("⚠️ 该笔记已在队列中", false); return;
         }
 
         btn.textContent = "⏳ 提取中...";
         btn.style.background = "rgba(0,0,0,0.5)";
 
         try {
-          const newTab = window.open(noteUrl, "_blank");
-          if (!newTab) { showToast("❌ 弹窗被阻止", false); btn.textContent = "➕ 待提取"; btn.style.background = "rgba(255,165,2,0.9)"; return; }
+          const response = await new Promise(resolve => {
+            try {
+              chrome.runtime.sendMessage({ action: "extractNote", url: noteUrl }, resp => {
+                if (chrome.runtime.lastError) { resolve({ data: null }); return; }
+                resolve(resp);
+              });
+            } catch (_) { resolve({ data: null }); }
+          });
 
-          await new Promise(r => setTimeout(r, 4000));
-
-          // 找到新标签页
-          const tabs = await chrome.tabs.query({ url: `*://*${new URL(noteUrl).pathname}*` });
-          const newTabInfo = tabs?.[tabs.length - 1];
-          let extractResult = null;
-
-          if (newTabInfo?.id) {
-            extractResult = await new Promise((resolve) => {
-              try {
-                chrome.scripting.executeScript({
-                  target: { tabId: newTabInfo.id }, world: "MAIN",
-                  func: () => {
-                    try {
-                      const state = window.__INITIAL_STATE__;
-                      const map = state?.note?.noteDetailMap || {};
-                      const id = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
-                      if (!id || !map[id]) return null;
-                      const d = map[id]; const n = d?.note && typeof d.note === "object" ? d.note : d;
-                      if (!n || (d?.note?.noteId && d.note.noteId !== id)) return null;
-                      const imgs = (n.imageList||[]).map(i=>{const u=i?.urlDefault||i?.urlPre||i?.url||"";return u.startsWith("//")?"https:"+u:u}).filter(Boolean);
-                      let vid=""; const s=n?.video?.media?.stream; if(s){const h=s.h264||s.h265||[];if(h.length>0)vid=h[0].masterUrl||"";}
-                      const c=[]; const cm=state?.comment?.commentMap||{}; for(const v of Object.values(cm)){if(v.content)c.push({user:v.userInfo?.nickname||"",content:v.content,likes:v.likeCount||0});}
-                      return {title:n?.title||"",desc:n?.desc||"",author:n?.user?.nickname||"",tags:(n?.tagList||[]).map(t=>t?.name).filter(Boolean),images:imgs,videoUrl:vid,noteType:(n?.type||"").toLowerCase(),comments:c,url:location.href};
-                    } catch(e){return null;}
-                  }
-                }).then(r=>resolve(r?.[0]?.result||null)).catch(()=>resolve(null));
-              } catch(_){resolve(null);}
-            });
-            chrome.tabs.remove(newTabInfo.id).catch(()=>{});
-          }
-
-          if (extractResult && (extractResult.title || extractResult.desc)) {
-            noteQueue.push(extractResult);
+          const data = response?.data;
+          if (data && (data.title || data.desc)) {
+            noteQueue.push(data);
             updateQueuePanel();
-            showToast(`✅ 已加入：${extractResult.title || "无标题"}`);
+            showToast(`✅ 已加入：${data.title || "无标题"}`);
             btn.textContent = "✅ 已提取";
             btn.style.background = "rgba(46,213,115,0.9)";
           } else {
