@@ -746,14 +746,18 @@
 
   function injectProfileButtonsInternal(noteList) {
     // 找所有笔记卡片链接
-    const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
+    const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
     const processed = new Set();
 
     noteLinks.forEach(link => {
       const href = link.getAttribute("href");
-      const match = href?.match(/\/explore\/([^/?#]+)/);
-      if (!match) return;
-      const noteId = match[1];
+      // 兼容两种链接格式：
+      // /explore/{noteId}?xsec_token=...
+      // /user/profile/{userId}/{noteId}?xsec_token=...
+      const matchExplore = href?.match(/\/explore\/([^/?#]+)/);
+      const matchProfile = href?.match(/\/user\/profile\/[^/]+\/([^/?#]+)/);
+      const noteId = matchExplore?.[1] || matchProfile?.[1];
+      if (!noteId) return;
       if (processed.has(noteId)) return;
       processed.add(noteId);
       if (link.querySelector(".xhs-card-extract")) return;
@@ -810,7 +814,7 @@
           await new Promise(r => setTimeout(r, 4000));
 
           // 找到新标签页
-          const tabs = await chrome.tabs.query({ url: `*://*/explore/${noteId}*` });
+          const tabs = await chrome.tabs.query({ url: `*://*${new URL(noteUrl).pathname}*` });
           const newTabInfo = tabs?.[tabs.length - 1];
           let extractResult = null;
 
