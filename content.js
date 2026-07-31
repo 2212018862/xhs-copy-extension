@@ -725,71 +725,92 @@
   // ══════════════════════════════════════════
 
   function injectProfileButtons() {
-    if (document.getElementById("xhs-profile-batch")) return;
     if (!/\/user\/profile\//.test(location.href)) return;
 
-    // 找到笔记列表区域，在其前面注入批量操作栏
+    // 找所有笔记卡片链接（去重）
     const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
-    if (noteLinks.length === 0) return;
+    const processed = new Set();
 
-    // 收集所有笔记链接（去重）
-    const noteUrls = new Set();
-    noteLinks.forEach(a => {
-      const href = a.getAttribute("href");
+    noteLinks.forEach(link => {
+      const href = link.getAttribute("href");
       const match = href?.match(/\/explore\/([^/?#]+)/);
-      if (match) noteUrls.add(`https://www.xiaohongshu.com/explore/${match[1]}`);
-    });
-    if (noteUrls.size === 0) return;
+      if (!match) return;
+      const noteId = match[1];
+      if (processed.has(noteId)) return;
+      processed.add(noteId);
 
-    // 创建批量操作栏
-    const bar = document.createElement("div");
-    bar.id = "xhs-profile-batch";
-    bar.style.cssText = `
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      z-index: 999999; background: #fff; border-radius: 12px; padding: 12px 20px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; gap: 10px; align-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-      font-size: 14px;
-    `;
-    bar.innerHTML = `
-      <span style="font-weight:600;">📋 检测到 ${noteUrls.size} 篇笔记</span>
-      <div id="xhs-batch-extract" style="padding:8px 18px;background:linear-gradient(135deg,#ffa502,#ff6348);color:#fff;border-radius:20px;cursor:pointer;font-weight:600;white-space:nowrap;">⚡ 全部加入待提取</div>
-      <div id="xhs-batch-close-bar" style="padding:8px 12px;background:#f5f5f5;color:#999;border-radius:20px;cursor:pointer;">✕</div>
-    `;
-    document.body.appendChild(bar);
+      // 已经加过按钮的跳过
+      if (link.querySelector(".xhs-card-extract")) return;
 
-    // 关闭操作栏
-    bar.querySelector("#xhs-batch-close-bar")?.addEventListener("click", () => bar.remove());
+      // 找卡片容器（往上找，直到找到有 position:relative 的父元素）
+      const card = link.closest('[style*="position"]') || link.parentElement;
+      if (!card) return;
 
-    // 全部加入待提取
-    bar.querySelector("#xhs-batch-extract")?.addEventListener("click", async () => {
-      const btn = bar.querySelector("#xhs-batch-extract");
-      const urls = [...noteUrls];
-      let done = 0;
+      // 创建按钮
+      const btn = document.createElement("div");
+      btn.className = "xhs-card-extract";
+      btn.textContent = "➕ 待提取";
+      btn.style.cssText = `
+        position: absolute; top: 8px; right: 8px; z-index: 10;
+        padding: 4px 10px; background: rgba(255,165,2,0.9); color: #fff;
+        border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+        opacity: 0; transition: opacity 0.2s;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      `;
 
-      for (const url of urls) {
-        // 去重检查
-        if (noteQueue.find(n => n.url === url)) { done++; continue; }
+      // 鼠标悬停显示按钮
+      const showBtn = () => { btn.style.opacity = "1"; };
+      const hideBtn = () => { btn.style.opacity = "0"; };
+      link.addEventListener("mouseenter", showBtn);
+      link.addEventListener("mouseleave", hideBtn);
 
-        btn.textContent = `⏳ 提取中 ${done + 1}/${urls.length}...`;
+      // 点击：后台提取
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const noteUrl = `https://www.xiaohongshu.com/explore/${noteId}`;
+
+        // 去重
+        if (noteQueue.find(n => n.url?.includes(noteId))) {
+          showToast("⚠️ 该笔记已在队列中", false);
+          return;
+        }
+
+        btn.textContent = "⏳ 提取中...";
+        btn.style.opacity = "1";
+        btn.style.background = "rgba(0,0,0,0.5)";
+
         try {
-          const data = await extractViaBackgroundTab(url);
+          const data = await extractViaBackgroundTab(noteUrl);
           if (data && (data.title || data.desc)) {
-            // 去重
-            if (!noteQueue.find(n => n.url === data.url)) {
+            if (!noteQueue.find(n => n.url?.includes(noteId))) {
               noteQueue.push(data);
             }
+            updateQueuePanel();
+            const title = data.title || data.desc?.substring(0, 20) || "无标题";
+            showToast(`✅ 已加入队列：${title}`);
+            btn.textContent = "✅ 已提取";
+            btn.style.background = "rgba(46,213,115,0.9)";
+          } else {
+            showToast("⚠️ 未提取到内容", false);
+            btn.textContent = "➕ 待提取";
+            btn.style.background = "rgba(255,165,2,0.9)";
           }
         } catch (err) {
-          console.error("[XHS-Copy] 提取失败:", url, err);
+          console.error("[XHS-Copy] 提取失败:", noteUrl, err);
+          showToast("❌ 提取失败", false);
+          btn.textContent = "➕ 待提取";
+          btn.style.background = "rgba(255,165,2,0.9)";
         }
-        done++;
-      }
+      });
 
-      updateQueuePanel();
-      btn.textContent = `✅ 完成！已提取 ${noteQueue.length} 篇`;
-      showToast(`✅ 批量提取完成！共 ${noteQueue.length} 篇笔记`);
-      setTimeout(() => btn.textContent = `⚡ 全部加入待提取`, 3000);
+      // 插入按钮到卡片上
+      if (getComputedStyle(card).position === "static") {
+        card.style.position = "relative";
+      }
+      card.appendChild(btn);
     });
   }
 
