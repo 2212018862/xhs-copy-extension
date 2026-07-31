@@ -730,15 +730,22 @@
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
+    console.log("[XHS-Copy] injectProfileButtons called");
+
     // 从 __INITIAL_STATE__ 提取笔记列表
     const notes = window.__INITIAL_STATE__?.user?.notes;
     const raw = notes?._rawValue || notes?._value || notes;
-    if (!raw || !Array.isArray(raw[0])) return;
+    if (!raw || !Array.isArray(raw[0])) {
+      console.log("[XHS-Copy] no note list found", { raw: !!raw, isArray: Array.isArray(raw?.[0]) });
+      return;
+    }
 
-    const noteList = raw[0]; // 数组，每条 { id, noteCard, xsecToken }
+    const noteList = raw[0];
+    console.log("[XHS-Copy] found", noteList.length, "notes in __INITIAL_STATE__");
 
     // 找所有笔记卡片链接
     const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
+    console.log("[XHS-Copy] found", noteLinks.length, "note links in DOM");
     const processed = new Set();
 
     noteLinks.forEach(link => {
