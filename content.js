@@ -782,11 +782,13 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
 
-      // 点击：直接从页面数据加入队列（不開新标签页）
-      btn.addEventListener("click", (e) => {
+      // 点击：通过 background fetch 完整笔记数据
+      btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
+
+        const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
 
         // 去重
         if (noteQueue.find(n => n.url?.includes(noteId))) {
@@ -794,20 +796,33 @@
           return;
         }
 
-        // 构建笔记数据
-        const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
-        const data = {
-          title, desc: "", author, tags: [],
-          images: noteItem.cover ? [noteItem.cover] : [],
-          videoUrl: "", noteType, comments: [],
-          url: noteUrl,
-        };
+        btn.textContent = "⏳ 提取中...";
+        btn.style.background = "rgba(0,0,0,0.5)";
 
-        noteQueue.push(data);
-        updateQueuePanel();
-        showToast(`✅ 已加入队列：${title || "无标题"}`);
-        btn.textContent = "✅ 已提取";
-        btn.style.background = "rgba(46,213,115,0.9)";
+        try {
+          const response = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ action: "fetchNote", url: noteUrl }, resolve);
+          });
+          const data = response?.data;
+          if (data && (data.title || data.desc)) {
+            if (!noteQueue.find(n => n.url?.includes(noteId))) {
+              noteQueue.push(data);
+            }
+            updateQueuePanel();
+            showToast(`✅ 已加入队列：${data.title || "无标题"}`);
+            btn.textContent = "✅ 已提取";
+            btn.style.background = "rgba(46,213,115,0.9)";
+          } else {
+            showToast("⚠️ 未提取到内容", false);
+            btn.textContent = "➕ 待提取";
+            btn.style.background = "rgba(255,165,2,0.9)";
+          }
+        } catch (err) {
+          console.error("[XHS-Copy] fetchNote failed:", noteUrl, err);
+          showToast("❌ 提取失败", false);
+          btn.textContent = "➕ 待提取";
+          btn.style.background = "rgba(255,165,2,0.9)";
+        }
       });
 
       if (getComputedStyle(cardEl).position === "static") {
