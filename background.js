@@ -24,8 +24,10 @@ function doExtract(url) {
         if (id !== tabId || info.status !== "complete") return;
         chrome.tabs.onUpdated.removeListener(listener);
 
-        // 轮询等待 __INITIAL_STATE__ 有数据，最多等 8 秒
+        // 每0.5秒检测，直到有数据或超时10秒
         let attempts = 0;
+        const MAX_ATTEMPTS = 20; // 20 * 0.5s = 10s
+
         const tryExtract = () => {
           attempts++;
           chrome.scripting.executeScript({
@@ -38,10 +40,34 @@ function doExtract(url) {
                 if (!id || !map[id]) return { ready: false };
                 const d = map[id]; const n = d?.note && typeof d.note === "object" ? d.note : d;
                 if (!n || (d?.note?.noteId && d.note.noteId !== id)) return { ready: false };
+
                 const imgs = (n.imageList||[]).map(i=>{const u=i?.urlDefault||i?.urlPre||i?.url||"";return u.startsWith("//")?"https:"+u:u}).filter(Boolean);
                 let vid=""; const s=n?.video?.media?.stream; if(s){const h=s.h264||s.h265||[];if(h.length>0)vid=h[0].masterUrl||"";}
+
+                // 评论：先从 state 取
                 const c=[]; const cm=state?.comment?.commentMap||{}; for(const v of Object.values(cm)){if(v.content)c.push({user:v.userInfo?.nickname||"",content:v.content,likes:v.likeCount||0});}
-                return { ready: true, title:n?.title||"",desc:n?.desc||"",author:n?.user?.nickname||"",tags:(n?.tagList||[]).map(t=>t?.name).filter(Boolean),images:imgs,videoUrl:vid,noteType:(n?.type||"").toLowerCase(),comments:c,url:location.href};
+
+                // 如果 state 没评论，从 DOM 取
+                if (c.length === 0) {
+                  document.querySelectorAll('[class*="comment-item"]').forEach(el => {
+                    try {
+                      const nameEl = el.querySelector('[class*="name"], [class*="nickname"]');
+                      const contentEl = el.querySelector('[class*="content"], [class*="text"], p');
+                      const text = contentEl ? (contentEl.textContent||"").trim() : (el.textContent||"").trim();
+                      const user = nameEl ? (nameEl.textContent||"").trim() : "";
+                      if (text.length > 0) c.push({ user, content: text, likes: 0 });
+                    } catch(_){}
+                  });
+                }
+
+                return {
+                  ready: true,
+                  title: n?.title||"", desc: n?.desc||"", author: n?.user?.nickname||"",
+                  tags: (n?.tagList||[]).map(t=>t?.name).filter(Boolean),
+                  images: imgs, videoUrl: vid,
+                  noteType: (n?.type||"").toLowerCase(),
+                  comments: c, url: location.href
+                };
               } catch(e){return { ready: false };}
             }
           }).then(r => {
@@ -49,19 +75,19 @@ function doExtract(url) {
             if (data?.ready) {
               cleanup();
               resolve({ data });
-            } else if (attempts < 8) {
-              setTimeout(tryExtract, 1000);
+            } else if (attempts < MAX_ATTEMPTS) {
+              setTimeout(tryExtract, 500);
             } else {
               cleanup();
               resolve({ data: null });
             }
           }).catch(() => { cleanup(); resolve({ data: null }); });
         };
-        setTimeout(tryExtract, 1000);
+        setTimeout(tryExtract, 500);
       };
 
       chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); cleanup(); resolve({ data: null }); }, 15000);
+      setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); cleanup(); resolve({ data: null }); }, 20000);
     });
   });
 }
