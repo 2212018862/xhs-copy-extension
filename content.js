@@ -720,6 +720,172 @@
     if (!injectButtons()) injectTimer = setTimeout(tryInject, 500);
   }
 
+  // ══════════════════════════════════════════
+  //  作者主页：批量提取笔记
+  // ══════════════════════════════════════════
+
+  function injectProfileButtons() {
+    if (document.getElementById("xhs-profile-batch")) return;
+    if (!/\/user\/profile\//.test(location.href)) return;
+
+    // 找到笔记列表区域，在其前面注入批量操作栏
+    const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
+    if (noteLinks.length === 0) return;
+
+    // 收集所有笔记链接（去重）
+    const noteUrls = new Set();
+    noteLinks.forEach(a => {
+      const href = a.getAttribute("href");
+      const match = href?.match(/\/explore\/([^/?#]+)/);
+      if (match) noteUrls.add(`https://www.xiaohongshu.com/explore/${match[1]}`);
+    });
+    if (noteUrls.size === 0) return;
+
+    // 创建批量操作栏
+    const bar = document.createElement("div");
+    bar.id = "xhs-profile-batch";
+    bar.style.cssText = `
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 999999; background: #fff; border-radius: 12px; padding: 12px 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; gap: 10px; align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    `;
+    bar.innerHTML = `
+      <span style="font-weight:600;">📋 检测到 ${noteUrls.size} 篇笔记</span>
+      <div id="xhs-batch-extract" style="padding:8px 18px;background:linear-gradient(135deg,#ffa502,#ff6348);color:#fff;border-radius:20px;cursor:pointer;font-weight:600;white-space:nowrap;">⚡ 全部加入待提取</div>
+      <div id="xhs-batch-close-bar" style="padding:8px 12px;background:#f5f5f5;color:#999;border-radius:20px;cursor:pointer;">✕</div>
+    `;
+    document.body.appendChild(bar);
+
+    // 关闭操作栏
+    bar.querySelector("#xhs-batch-close-bar")?.addEventListener("click", () => bar.remove());
+
+    // 全部加入待提取
+    bar.querySelector("#xhs-batch-extract")?.addEventListener("click", async () => {
+      const btn = bar.querySelector("#xhs-batch-extract");
+      const urls = [...noteUrls];
+      let done = 0;
+
+      for (const url of urls) {
+        // 去重检查
+        if (noteQueue.find(n => n.url === url)) { done++; continue; }
+
+        btn.textContent = `⏳ 提取中 ${done + 1}/${urls.length}...`;
+        try {
+          const data = await extractViaBackgroundTab(url);
+          if (data && (data.title || data.desc)) {
+            // 去重
+            if (!noteQueue.find(n => n.url === data.url)) {
+              noteQueue.push(data);
+            }
+          }
+        } catch (err) {
+          console.error("[XHS-Copy] 提取失败:", url, err);
+        }
+        done++;
+      }
+
+      updateQueuePanel();
+      btn.textContent = `✅ 完成！已提取 ${noteQueue.length} 篇`;
+      showToast(`✅ 批量提取完成！共 ${noteQueue.length} 篇笔记`);
+      setTimeout(() => btn.textContent = `⚡ 全部加入待提取`, 3000);
+    });
+  }
+
+  // 后台标签页提取：开新标签 → 等加载 → 提取 → 关标签
+  function extractViaBackgroundTab(url) {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.create({ url, active: false }, (tab) => {
+        const tabId = tab.id;
+        let resolved = false;
+
+        const cleanup = () => {
+          if (!resolved) {
+            resolved = true;
+            try { chrome.tabs.remove(tabId); } catch (_) {}
+          }
+        };
+
+        // 监听标签页加载完成
+        const listener = (id, info) => {
+          if (id !== tabId || info.status !== "complete") return;
+          chrome.tabs.onUpdated.removeListener(listener);
+
+          // 等待页面渲染（给 React 时间）
+          setTimeout(() => {
+            // 在后台标签页执行提取脚本
+            chrome.scripting.executeScript({
+              target: { tabId },
+              world: "MAIN",
+              func: () => {
+                // 从 __INITIAL_STATE__ 提取
+                try {
+                  const state = window.__INITIAL_STATE__;
+                  const noteState = state?.note ?? {};
+                  const detailMap = noteState.noteDetailMap ?? {};
+                  const currentUrlNoteId = (location.pathname.match(/\/explore\/([^/?#]+)/) || [])[1] || "";
+                  if (!currentUrlNoteId) return null;
+
+                  let detail = detailMap[currentUrlNoteId];
+                  if (!detail) return null;
+
+                  const note = detail?.note && typeof detail.note === "object" ? detail.note : detail;
+                  if (!note) return null;
+
+                  const foundNoteId = detail?.note?.noteId || detail?.noteId;
+                  if (foundNoteId && foundNoteId !== currentUrlNoteId) return null;
+
+                  const title = note?.title || "";
+                  const desc = note?.desc || "";
+                  const author = note?.user?.nickname || "";
+                  const tags = (note?.tagList || []).map(t => t?.name).filter(Boolean);
+
+                  // 图片
+                  const images = [];
+                  for (const img of (note?.imageList || [])) {
+                    const url = img?.urlDefault || img?.urlPre || img?.url || "";
+                    if (url) images.push(url.startsWith("//") ? "https:" + url : url);
+                  }
+
+                  // 视频
+                  let videoUrl = "";
+                  const streams = note?.video?.media?.stream;
+                  if (streams) {
+                    const h264 = streams.h264 || streams.h265 || [];
+                    if (h264.length > 0) videoUrl = h264[0].masterUrl || "";
+                  }
+
+                  const noteType = (note?.type || "").toLowerCase();
+
+                  return { title, desc, author, tags, images, videoUrl, noteType, url: location.href };
+                } catch (e) {
+                  return null;
+                }
+              }
+            }).then((results) => {
+              const data = results?.[0]?.result;
+              cleanup();
+              resolve(data);
+            }).catch((err) => {
+              cleanup();
+              reject(err);
+            });
+          }, 3000); // 等3秒让页面渲染
+        };
+
+        chrome.tabs.onUpdated.addListener(listener);
+
+        // 超时保护：10秒
+        setTimeout(() => {
+          chrome.tabs.onUpdated.removeListener(listener);
+          cleanup();
+          reject(new Error("timeout"));
+        }, 10000);
+      });
+    });
+  }
+
   const origPush = history.pushState;
   const origReplace = history.replaceState;
   history.pushState = function () { origPush.apply(this, arguments); onUrlChange(); };
@@ -728,7 +894,9 @@
 
   new MutationObserver(() => {
     if (/\/explore\/|\/discovery\/item\//.test(location.href) && !document.getElementById(BUTTON_ID)) tryInject();
+    if (/\/user\/profile\//.test(location.href)) injectProfileButtons();
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   setTimeout(tryInject, 1500);
+  setTimeout(injectProfileButtons, 1500);
 })();
