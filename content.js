@@ -762,15 +762,10 @@
         position: absolute; top: 8px; right: 8px; z-index: 10;
         padding: 4px 10px; background: rgba(255,165,2,0.9); color: #fff;
         border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer;
-        opacity: 0; transition: opacity 0.2s;
+        opacity: 1; transition: all 0.2s;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
-
-      // 鼠标悬停显示按钮
-      const showBtn = () => { btn.style.opacity = "1"; };
-      const hideBtn = () => { btn.style.opacity = "0"; };
-      link.addEventListener("mouseenter", showBtn);
-      link.addEventListener("mouseleave", hideBtn);
 
       // 点击：后台提取
       btn.addEventListener("click", async (e) => {
