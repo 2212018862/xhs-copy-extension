@@ -52,7 +52,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             }
           }).then(r => { cleanup(); sendResponse({ data: r?.[0]?.result || null }); })
             .catch(() => { cleanup(); sendResponse({ data: null }); });
-        }, 4000);
+        }, 6000);
       };
       chrome.tabs.onUpdated.addListener(listener);
       setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); cleanup(); sendResponse({ data: null }); }, 10000);
