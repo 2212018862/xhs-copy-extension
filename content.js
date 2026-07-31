@@ -727,11 +727,17 @@
   let profileTimer = null;
   function injectProfileButtons() {
     if (!/\/user\/profile\//.test(location.href)) return;
-    // 节流：避免 MutationObserver 频繁触发
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
-    // 找所有笔记卡片链接（去重）
+    // 从 __INITIAL_STATE__ 提取笔记列表
+    const notes = window.__INITIAL_STATE__?.user?.notes;
+    const raw = notes?._rawValue || notes?._value || notes;
+    if (!raw || !Array.isArray(raw[0])) return;
+
+    const noteList = raw[0]; // 数组，每条 { id, noteCard, xsecToken }
+
+    // 找所有笔记卡片链接
     const noteLinks = document.querySelectorAll('a[href*="/explore/"]');
     const processed = new Set();
 
@@ -742,19 +748,23 @@
       const noteId = match[1];
       if (processed.has(noteId)) return;
       processed.add(noteId);
-
-      // 已经加过按钮的跳过
       if (link.querySelector(".xhs-card-extract")) return;
 
-      // 取完整 URL（含 xsec_token 等参数）
-      const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+      // 从 __INITIAL_STATE__ 找对应笔记数据
+      const noteItem = noteList.find(n => n.id === noteId || n.noteCard?.noteId === noteId);
+      if (!noteItem) return;
+
+      const card = noteItem.noteCard || {};
+      const title = card.displayTitle || "";
+      const author = card.user?.nickname || "";
+      const noteType = card.type || "normal";
 
       // 找卡片容器
-      let card = link;
+      let cardEl = link;
       for (let i = 0; i < 5; i++) {
-        if (!card.parentElement) break;
-        card = card.parentElement;
-        if (getComputedStyle(card).position !== "static") break;
+        if (!cardEl.parentElement) break;
+        cardEl = cardEl.parentElement;
+        if (getComputedStyle(cardEl).position !== "static") break;
       }
 
       // 创建按钮
@@ -770,13 +780,11 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
 
-      // 点击：后台提取
-      btn.addEventListener("click", async (e) => {
+      // 点击：直接从页面数据加入队列（不開新标签页）
+      btn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-
-        const noteUrl = fullUrl;
 
         // 去重
         if (noteQueue.find(n => n.url?.includes(noteId))) {
@@ -784,39 +792,31 @@
           return;
         }
 
-        btn.textContent = "⏳ 提取中...";
-        btn.style.opacity = "1";
-        btn.style.background = "rgba(0,0,0,0.5)";
+        // 构建笔记数据
+        const noteUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+        const data = {
+          title: title,
+          desc: "",
+          author: author,
+          tags: [],
+          images: card.cover ? [card.cover.urlDefault || card.cover.url || ""] : [],
+          videoUrl: "",
+          noteType: noteType,
+          comments: [],
+          url: noteUrl,
+        };
 
-        try {
-          const data = await extractViaBackgroundTab(noteUrl);
-          if (data && (data.title || data.desc)) {
-            if (!noteQueue.find(n => n.url?.includes(noteId))) {
-              noteQueue.push(data);
-            }
-            updateQueuePanel();
-            const title = data.title || data.desc?.substring(0, 20) || "无标题";
-            showToast(`✅ 已加入队列：${title}`);
-            btn.textContent = "✅ 已提取";
-            btn.style.background = "rgba(46,213,115,0.9)";
-          } else {
-            showToast("⚠️ 未提取到内容", false);
-            btn.textContent = "➕ 待提取";
-            btn.style.background = "rgba(255,165,2,0.9)";
-          }
-        } catch (err) {
-          console.error("[XHS-Copy] 提取失败:", noteUrl, err);
-          showToast("❌ 提取失败", false);
-          btn.textContent = "➕ 待提取";
-          btn.style.background = "rgba(255,165,2,0.9)";
-        }
+        noteQueue.push(data);
+        updateQueuePanel();
+        showToast(`✅ 已加入队列：${title || "无标题"}`);
+        btn.textContent = "✅ 已提取";
+        btn.style.background = "rgba(46,213,115,0.9)";
       });
 
-      // 插入按钮到卡片上
-      if (getComputedStyle(card).position === "static") {
-        card.style.position = "relative";
+      if (getComputedStyle(cardEl).position === "static") {
+        cardEl.style.position = "relative";
       }
-      card.appendChild(btn);
+      cardEl.appendChild(btn);
     });
   }
 
