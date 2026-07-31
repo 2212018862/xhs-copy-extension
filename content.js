@@ -787,7 +787,7 @@
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
       `;
 
-      // 点击：后台开标签页提取完整笔记数据
+      // 点击：window.open 在新标签页打开（跟右键行为一致）
       btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -804,79 +804,64 @@
         btn.style.background = "rgba(0,0,0,0.5)";
 
         try {
-          // 获取当前 tab ID 作为 openerTabId
-          const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          const openerTabId = currentTab?.id;
-
-          const response = await new Promise((resolve) => {
-            try {
-              chrome.runtime.sendMessage({ action: "openTab", url: noteUrl, openerTabId }, (resp) => {
-                if (chrome.runtime.lastError) { resolve({ tabId: null }); return; }
-                resolve(resp);
-              });
-            } catch (_) { resolve({ tabId: null }); }
-          });
-
-          if (!response?.tabId) {
-            showToast("❌ 打开标签页失败", false);
+          // 用 window.open 开新标签页（保留 referer）
+          const newTab = window.open(noteUrl, "_blank");
+          if (!newTab) {
+            showToast("❌ 弹窗被阻止，请允许弹窗", false);
             btn.textContent = "➕ 待提取";
             btn.style.background = "rgba(255,165,2,0.9)";
             return;
           }
 
-          const tabId = response.tabId;
-
-          // 等页面加载 + 渲染
+          // 等页面加载
           await new Promise(r => setTimeout(r, 4000));
 
-          // 在后台标签页执行提取
-          const extractResult = await new Promise((resolve) => {
-            try {
-              chrome.scripting.executeScript({
-                target: { tabId },
-                world: "MAIN",
-                func: () => {
-                  try {
-                    const state = window.__INITIAL_STATE__;
-                    const noteDetailMap = state?.note?.noteDetailMap || {};
-                    const noteId = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
-                    if (!noteId) return null;
-                    const detail = noteDetailMap[noteId];
-                    if (!detail) return null;
-                    const note = detail?.note && typeof detail.note === "object" ? detail.note : detail;
-                    if (!note) return null;
-                    const foundNoteId = detail?.note?.noteId || detail?.noteId;
-                    if (foundNoteId && foundNoteId !== noteId) return null;
-                    const title = note?.title || "";
-                    const desc = note?.desc || "";
-                    const author = note?.user?.nickname || "";
-                    const tags = (note?.tagList || []).map(t => t?.name).filter(Boolean);
-                    const images = (note?.imageList || []).map(img => {
-                      const url = img?.urlDefault || img?.urlPre || img?.url || "";
-                      return url.startsWith("//") ? "https:" + url : url;
-                    }).filter(Boolean);
-                    let videoUrl = "";
-                    const streams = note?.video?.media?.stream;
-                    if (streams) {
-                      const h264 = streams.h264 || streams.h265 || [];
-                      if (h264.length > 0) videoUrl = h264[0].masterUrl || "";
-                    }
-                    const comments = [];
-                    const commentMap = state?.comment?.commentMap || {};
-                    for (const c of Object.values(commentMap)) {
-                      if (c.content) comments.push({ user: c.userInfo?.nickname || "", content: c.content, likes: c.likeCount || 0 });
-                    }
-                    return { title, desc, author, tags, images, videoUrl, noteType: (note?.type || "").toLowerCase(), comments, url: location.href };
-                  } catch (e) { return null; }
-                }
-              }).then(results => {
-                resolve(results?.[0]?.result || null);
-              }).catch(() => resolve(null));
-            } catch (_) { resolve(null); }
-          });
+          // 尝试从新标签页提取数据
+          let extractResult = null;
+          try {
+            extractResult = newTab.__XHS_NOTE_DATA__;
+          } catch (_) {
+            // 跨域访问不了，用 background 的 scripting API
+          }
 
-          // 关闭标签页
-          chrome.runtime.sendMessage({ action: "closeTab", tabId });
+          // 如果 window.open 拿不到数据，用 chrome.scripting
+          if (!extractResult) {
+            // 找到新标签页的 tabId
+            const tabs = await chrome.tabs.query({ url: noteUrl });
+            const newTabInfo = tabs?.find(t => t.url?.includes(noteId));
+            if (newTabInfo?.id) {
+              extractResult = await new Promise((resolve) => {
+                try {
+                  chrome.scripting.executeScript({
+                    target: { tabId: newTabInfo.id },
+                    world: "MAIN",
+                    func: () => {
+                      try {
+                        const state = window.__INITIAL_STATE__;
+                        const map = state?.note?.noteDetailMap || {};
+                        const id = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1] || "";
+                        if (!id || !map[id]) return null;
+                        const d = map[id];
+                        const n = d?.note && typeof d.note === "object" ? d.note : d;
+                        if (!n) return null;
+                        if (d?.note?.noteId && d.note.noteId !== id) return null;
+                        const imgs = (n.imageList || []).map(i => { const u = i?.urlDefault || i?.urlPre || i?.url || ""; return u.startsWith("//") ? "https:" + u : u; }).filter(Boolean);
+                        let vid = "";
+                        const s = n?.video?.media?.stream;
+                        if (s) { const h = s.h264 || s.h265 || []; if (h.length > 0) vid = h[0].masterUrl || ""; }
+                        const cmts = [];
+                        const cm = state?.comment?.commentMap || {};
+                        for (const c of Object.values(cm)) { if (c.content) cmts.push({ user: c.userInfo?.nickname || "", content: c.content, likes: c.likeCount || 0 }); }
+                        return { title: n?.title || "", desc: n?.desc || "", author: n?.user?.nickname || "", tags: (n?.tagList || []).map(t => t?.name).filter(Boolean), images: imgs, videoUrl: vid, noteType: (n?.type || "").toLowerCase(), comments: cmts, url: location.href };
+                      } catch (e) { return null; }
+                    }
+                  }).then(r => resolve(r?.[0]?.result || null)).catch(() => resolve(null));
+                } catch (_) { resolve(null); }
+              });
+              // 关闭标签页
+              chrome.tabs.remove(newTabInfo.id).catch(() => {});
+            }
+          }
 
           if (extractResult && (extractResult.title || extractResult.desc)) {
             if (!noteQueue.find(n => n.url?.includes(noteId))) {
