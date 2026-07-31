@@ -44,10 +44,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .then(r => r.text())
       .then(html => {
         // 从 HTML 中提取 __INITIAL_STATE__
-        const match = html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});?\s*<\/script>/);
-        if (!match) { sendResponse({ data: null }); return; }
+        // 找到 __INITIAL_STATE__ 的起始位置
+        const stateIdx = html.indexOf("window.__INITIAL_STATE__=");
+        if (stateIdx === -1) { sendResponse({ data: null }); return; }
+        const start = stateIdx + "window.__INITIAL_STATE__=".length;
+        // 找到对应的 </script> 结束位置
+        const scriptEnd = html.indexOf("</script>", start);
+        if (scriptEnd === -1) { sendResponse({ data: null }); return; }
+        let stateStr = html.substring(start, scriptEnd).trim();
+        // 去掉末尾可能的分号
+        if (stateStr.endsWith(";")) stateStr = stateStr.slice(0, -1);
         try {
-          const state = JSON.parse(match[1]);
+          const state = JSON.parse(stateStr);
           const noteDetailMap = state?.note?.noteDetailMap || {};
           const noteId = msg.url.match(/\/explore\/([^/?#]+)/)?.[1] || "";
           const detail = noteDetailMap[noteId];
