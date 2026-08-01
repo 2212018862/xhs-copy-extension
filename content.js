@@ -730,7 +730,11 @@
   let profileTimer = null;
   let batchProcessing = false;
   function injectProfileButtons() {
-    if (!/\/user\/profile\//.test(location.href)) return;
+    if (!/\/user\/profile\//.test(location.href)) {
+      // 不在作者首页，清理残留元素
+      document.getElementById("xhs-profile-all")?.remove();
+      return;
+    }
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
