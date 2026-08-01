@@ -744,8 +744,23 @@
     }
   }
 
+  // 笔记ID → 按钮元素映射（用于实时更新状态）
+  const cardBtnMap = new Map();
+
+  function setCardBtnStatus(noteId, status, text) {
+    const btn = cardBtnMap.get(noteId);
+    if (!btn) return;
+    btn.textContent = text || status;
+    const colors = {
+      "排队中": "rgba(0,0,0,0.4)",
+      "提取中": "rgba(255,165,2,0.9)",
+      "已提取": "rgba(46,213,115,0.9)",
+      "失败": "rgba(255,71,87,0.9)",
+    };
+    btn.style.background = colors[status] || "rgba(255,165,2,0.9)";
+  }
+
   function injectProfileButtonsInternal(noteList) {
-    // 找所有笔记卡片链接
     const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
     const processed = new Set();
 
@@ -807,6 +822,7 @@
 
         btn.textContent = "⏳ 提取中...";
         btn.style.background = "rgba(0,0,0,0.5)";
+        setCardBtnStatus(noteId, "提取中", "⏳ 提取中...");
 
         try {
           const response = await new Promise(resolve => {
@@ -823,16 +839,19 @@
             noteQueue.push(data);
             updateQueuePanel();
             showToast(`✅ 已加入：${data.title || "无标题"}`);
+            setCardBtnStatus(noteId, "已提取", "✅ 已提取");
             btn.textContent = "✅ 已提取";
             btn.style.background = "rgba(46,213,115,0.9)";
           } else {
             showToast("⚠️ 未提取到内容", false);
+            setCardBtnStatus(noteId, "失败", "➕ 待提取");
             btn.textContent = "➕ 待提取";
             btn.style.background = "rgba(255,165,2,0.9)";
           }
         } catch (err) {
           console.error("[XHS-Copy]", err);
           showToast("❌ 提取失败", false);
+          setCardBtnStatus(noteId, "失败", "➕ 待提取");
           btn.textContent = "➕ 待提取";
           btn.style.background = "rgba(255,165,2,0.9)";
         }
@@ -842,6 +861,7 @@
         cardEl.style.position = "relative";
       }
       cardEl.appendChild(btn);
+      cardBtnMap.set(noteId, btn);
     });
 
     // 底部悬浮按钮：全部加入待提取
@@ -898,6 +918,7 @@
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
+        setCardBtnStatus(nid, "提取中", `⏳ ${done}/${toExtract.length}`);
 
         const token = item.xsecToken || "";
         const noteUrl = `https://www.xiaohongshu.com/explore/${nid}?xsec_token=${token}&xsec_source=pc_user`;
@@ -918,11 +939,14 @@
               noteQueue.push(data);
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
+            setCardBtnStatus(nid, "已提取", "✅ 已提取");
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
+            setCardBtnStatus(nid, "失败", "⚠️ 失败");
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
+          setCardBtnStatus(nid, "失败", "❌ 失败");
         }
         updateQueuePanel();
       }
