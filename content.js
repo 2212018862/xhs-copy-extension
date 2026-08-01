@@ -861,7 +861,7 @@
         cardEl.style.position = "relative";
       }
       cardEl.appendChild(btn);
-      cardBtnMap.set(noteId, btn);
+      if (!cardBtnMap.has(noteId)) cardBtnMap.set(noteId, btn);
     });
 
     // 底部悬浮按钮：全部加入待提取
