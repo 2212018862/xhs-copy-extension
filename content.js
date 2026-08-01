@@ -843,6 +843,99 @@
       }
       cardEl.appendChild(btn);
     });
+
+    // 底部悬浮按钮：全部加入待提取
+    if (document.getElementById("xhs-profile-all")) return;
+    const allBar = document.createElement("div");
+    allBar.id = "xhs-profile-all";
+    allBar.style.cssText = `
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 999999; background: #fff; border-radius: 12px; padding: 12px 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: flex; gap: 10px; align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    `;
+    allBar.innerHTML = `
+      <div id="xhs-all-extract" style="padding:10px 20px;background:linear-gradient(135deg,#ffa502,#ff6348);color:#fff;border-radius:20px;cursor:pointer;font-weight:600;white-space:nowrap;">⚡ 全部加入待提取（${noteList.length}篇）</div>
+      <div id="xhs-all-stop" style="display:none;padding:10px 14px;background:#ff4757;color:#fff;border-radius:20px;cursor:pointer;font-weight:600;">⏹ 停止</div>
+      <div id="xhs-all-progress" style="display:none;font-weight:500;color:#666;"></div>
+    `;
+    document.body.appendChild(allBar);
+
+    let stopped = false;
+    allBar.querySelector("#xhs-all-stop")?.addEventListener("click", () => { stopped = true; });
+
+    allBar.querySelector("#xhs-all-extract")?.addEventListener("click", async () => {
+      const extractBtn = allBar.querySelector("#xhs-all-extract");
+      const stopBtn = allBar.querySelector("#xhs-all-stop");
+      const progressEl = allBar.querySelector("#xhs-all-progress");
+
+      extractBtn.style.display = "none";
+      stopBtn.style.display = "block";
+      progressEl.style.display = "block";
+      stopped = false;
+
+      const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
+      const processed = new Set();
+      const toExtract = [];
+
+      noteLinks.forEach(link => {
+        const href = link.getAttribute("href");
+        const m1 = href?.match(/\/explore\/([^/?#]+)/);
+        const m2 = href?.match(/\/user\/profile\/[^/]+\/([^/?#]+)/);
+        const nid = m1?.[1] || m2?.[1];
+        if (!nid || processed.has(nid)) return;
+        processed.add(nid);
+        const item = noteList.find(n => n.id === nid || n.noteId === nid);
+        if (item && !noteQueue.find(n => n.url?.includes(nid))) {
+          toExtract.push({ nid, item, href });
+        }
+      });
+
+      let done = 0;
+      for (const { nid, item, href } of toExtract) {
+        if (stopped) break;
+        done++;
+        progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
+        extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
+
+        const token = item.xsecToken || "";
+        const noteUrl = `https://www.xiaohongshu.com/explore/${nid}?xsec_token=${token}&xsec_source=pc_user`;
+
+        try {
+          const response = await new Promise(resolve => {
+            try {
+              chrome.runtime.sendMessage({ action: "extractNote", url: noteUrl }, resp => {
+                if (chrome.runtime.lastError) { resolve({ data: null }); return; }
+                resolve(resp);
+              });
+            } catch (_) { resolve({ data: null }); }
+          });
+
+          const data = response?.data;
+          if (data && (data.title || data.desc)) {
+            if (!noteQueue.find(n => n.url?.includes(nid))) {
+              noteQueue.push(data);
+            }
+            progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
+          } else {
+            progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
+          }
+        } catch (err) {
+          progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
+        }
+        updateQueuePanel();
+      }
+
+      extractBtn.style.display = "block";
+      extractBtn.textContent = `⚡ 全部加入待提取（${noteList.length}篇）`;
+      stopBtn.style.display = "none";
+      if (!stopped) {
+        progressEl.textContent = `✅ 完成！共提取 ${noteQueue.length} 篇`;
+      } else {
+        progressEl.textContent = `⏹ 已停止，已提取 ${noteQueue.length} 篇`;
+      }
+    });
   }
 
   // 后台标签页提取：开新标签 → 等加载 → 提取 → 关标签
