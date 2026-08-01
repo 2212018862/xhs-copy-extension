@@ -918,8 +918,8 @@
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
-        setCardBtnStatus(nid, "提取中", `${done}/${toExtract.length}`);
-        console.log("[XHS-Copy] batch:", nid, "btn:", cardBtnMap.has(nid) ? "found" : "MISSING");
+        setCardBtnStatus(nid, "提取中", `⏳ ${done}/${toExtract.length}/${toExtract.length}`);
+        
 
         const token = item.xsecToken || "";
         const noteUrl = `https://www.xiaohongshu.com/explore/${nid}?xsec_token=${token}&xsec_source=pc_user`;
