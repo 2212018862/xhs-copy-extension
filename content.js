@@ -948,6 +948,7 @@
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
+        if (btn) { btn.textContent = `⏳ 提取中 ${done}/${toExtract.length}`; btn.style.background = "rgba(255,165,2,0.95)"; btn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)"; btn.style.zIndex = "999999"; }
 
 
         const token = item.xsecToken || "";
@@ -972,12 +973,14 @@
               noteQueue.push(data);
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
+            if (btn) { btn.textContent = "✅ 已提取"; btn.style.background = "rgba(46,213,115,0.95)"; btn.style.boxShadow = "none"; btn.style.zIndex = "999999"; }
 
 
             const elapsed = Date.now() - extractStart;
             if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
+            if (btn) { btn.textContent = "⚠️ 失败"; btn.style.background = "rgba(255,71,87,0.95)"; btn.style.boxShadow = "none"; btn.style.zIndex = "999999"; }
 
 
             const elapsed2 = Date.now() - extractStart;
@@ -985,6 +988,7 @@
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
+          if (btn) { btn.textContent = "❌ 失败"; btn.style.background = "rgba(255,71,87,0.95)"; btn.style.boxShadow = "none"; btn.style.zIndex = "999999"; }
 
 
           const elapsed3 = Date.now() - extractStart;
