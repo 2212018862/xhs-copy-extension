@@ -753,7 +753,7 @@
     let btn = cardBtnMap.get(noteId);
     if (!btn || !btn.isConnected) {
       // 从 DOM 找包含 noteId 的 data 属性按钮
-      btn = document.querySelector(`.xhs-card-extract[data-nid="${noteId}"]`);
+      const cardBtn = link.closest(".note-item")?.querySelector(".xhs-card-extract") || document.querySelector(`.xhs-card-extract[data-nid="${nid}"]`);
       if (btn) cardBtnMap.set(noteId, btn);
     }
     if (!btn) return;
