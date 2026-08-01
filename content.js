@@ -783,13 +783,9 @@
       if (!noteId) return;
       if (processed.has(noteId)) return;
       processed.add(noteId);
-      // 按钮在 cardEl 上，不在 link 上，所以检查 cardEl
-      let checkEl = link;
-      for (let i = 0; i < 5; i++) {
-        if (checkEl.querySelector(".xhs-card-extract")) return;
-        if (!checkEl.parentElement) break;
-        checkEl = checkEl.parentElement;
-      }
+      // 只检查 link 本身和直接父元素是否有按钮（避免查到公共祖先）
+      if (link.querySelector(".xhs-card-extract")) return;
+      if (link.parentElement?.querySelector(".xhs-card-extract")) return;
 
       // 从 noteList 找对应数据
       const noteItem = noteList.find(n => n.id === noteId || n.noteId === noteId);
