@@ -909,17 +909,10 @@
       progressEl.style.display = "block";
       stopped = false;
       batchProcessing = true;
-      // 所有按钮显示排队中
-      allBtns.forEach(el => {
-        el.textContent = "⏳ 排队中";
-        el.style.background = "rgba(0,0,0,0.4)";
-        el.style.opacity = "0.7";
-        el.style.pointerEvents = "none";
-      });
-
-
       // 按DOM顺序收集所有卡片按钮
       const allBtns = Array.from(document.querySelectorAll('.xhs-card-extract'));
+      // 所有按钮显示排队中
+      allBtns.forEach(el => { el.textContent = "⏳ 排队中"; el.style.background = "rgba(0,0,0,0.4)"; el.style.opacity = "0.7"; el.style.pointerEvents = "none"; });
       const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
       const processed = new Set();
       const toExtract = [];
