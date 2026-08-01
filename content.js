@@ -700,6 +700,9 @@
     lastUrl = location.href;
     const old = document.getElementById(BUTTON_ID)?.parentElement;
     if (old) old.remove();
+    document.getElementById("xhs-profile-all")?.remove();
+    document.querySelector(".xhs-queue-panel")?.remove();
+    batchProcessing = false;
     cachedData = null;
     clearTimeout(injectTimer);
     injectTimer = setTimeout(tryInject, 800);
