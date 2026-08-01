@@ -749,7 +749,6 @@
   const cardBtnMap = new Map();
 
   function setCardBtnStatus(noteId, status, text) {
-    console.log("[XHS-Copy] setCardBtnStatus:", noteId, status);
     // 优先从 Map 找，找不到则从 DOM 找
     let btn = cardBtnMap.get(noteId);
     if (!btn || !btn.isConnected) {
@@ -932,17 +931,20 @@
         processed.add(nid);
         const item = noteList.find(n => n.id === nid || n.noteId === nid);
         if (item && !noteQueue.find(n => n.url?.includes(nid))) {
-          toExtract.push({ nid, item, href });
+          // 保存该卡片对应的按钮引用
+          const cardBtn = document.querySelector('.xhs-card-extract') || document.querySelector(`.xhs-card-extract[data-nid="${nid}"]`);
+          toExtract.push({ nid, item, href, btn: cardBtn });
         }
       });
 
       let done = 0;
-      for (const { nid, item, href } of toExtract) {
+      for (const { nid, item, href, btn } of toExtract) {
         if (stopped) break;
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
-        setCardBtnStatus(nid, "提取中", `⏳ ${done}/${toExtract.length}/${toExtract.length}`);
+        // 直接更新按钮引用
+        if (btn) { btn.textContent = `⏳ ${done}/${toExtract.length}`; btn.style.background = "rgba(255,165,2,0.9)"; }
         
 
         const token = item.xsecToken || "";
@@ -967,18 +969,18 @@
               noteQueue.push(data);
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
-            setCardBtnStatus(nid, "已提取", "✅ 已提取");
+            if (btn) { btn.textContent = "✅ 已提取"; btn.style.background = "rgba(46,213,115,0.9)"; }
             const elapsed = Date.now() - extractStart;
             if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
-            setCardBtnStatus(nid, "失败", "⚠️ 失败");
+            if (btn) { btn.textContent = "⚠️ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; }
             const elapsed2 = Date.now() - extractStart;
             if (elapsed2 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed2));
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
-          setCardBtnStatus(nid, "失败", "❌ 失败");
+          if (btn) { btn.textContent = "❌ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; }
           const elapsed3 = Date.now() - extractStart;
           if (elapsed3 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed3));
         }
