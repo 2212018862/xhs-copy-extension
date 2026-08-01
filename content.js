@@ -909,15 +909,10 @@
       progressEl.style.display = "block";
       stopped = false;
       batchProcessing = true;
-      // 先隐藏所有待提取按钮，改为显示排队状态
+      // 批量处理期间禁用所有卡片按钮
       document.querySelectorAll('.xhs-card-extract').forEach(el => {
-        el.textContent = "⏳ 排队中";
-            el.style.background = "rgba(0,0,0,0.25)";
-            el.style.opacity = "0.6";
-            el.style.pointerEvents = "none";
-            el.style.zIndex = "1";
-            el.style.fontSize = "11px";
-            el.style.padding = "3px 6px";
+        el.style.pointerEvents = "none";
+        el.style.opacity = "0.4";
       });
 
 
@@ -946,8 +941,7 @@
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
-        // 直接更新按钮引用
-        if (btn) { btn.textContent = `⏳ ${done}/${toExtract.length}`; btn.style.background = "rgba(255,165,2,0.9)"; }
+    
         
 
         const token = item.xsecToken || "";
@@ -972,18 +966,18 @@
               noteQueue.push(data);
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
-            if (btn) { btn.textContent = "✅ 已提取"; btn.style.background = "rgba(46,213,115,0.9)"; }
+
             const elapsed = Date.now() - extractStart;
             if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
-            if (btn) { btn.textContent = "⚠️ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; }
+
             const elapsed2 = Date.now() - extractStart;
             if (elapsed2 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed2));
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
-          if (btn) { btn.textContent = "❌ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; }
+
           const elapsed3 = Date.now() - extractStart;
           if (elapsed3 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed3));
         }
@@ -996,9 +990,11 @@
       if (!stopped) {
         progressEl.textContent = `✅ 完成！共提取 ${noteQueue.length} 篇`;
         batchProcessing = false;
+        document.querySelectorAll('.xhs-card-extract').forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
       } else {
         progressEl.textContent = `⏹ 已停止，已提取 ${noteQueue.length} 篇`;
         batchProcessing = false;
+        document.querySelectorAll('.xhs-card-extract').forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
       }
     });
   }
