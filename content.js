@@ -809,7 +809,7 @@
       btn.setAttribute("data-nid", noteId);
       btn.textContent = "➕ 待提取";
       btn.style.cssText = `
-        position: absolute; top: 8px; right: 8px; z-index: 10;
+        position: absolute; top: 8px; right: 8px; z-index: 99999;
         padding: 4px 10px; background: rgba(255,165,2,0.9); color: #fff;
         border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer;
         opacity: 1; transition: all 0.2s;
