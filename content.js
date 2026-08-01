@@ -921,6 +921,32 @@
       stopped = false;
       batchProcessing = true;
       // 按DOM顺序收集所有卡片按钮
+      // 确保所有卡片都有按钮
+      const noteLinksForInit = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
+      const seenIds = new Set();
+      noteLinksForInit.forEach(link => {
+        const href = link.getAttribute("href");
+        const m1 = href?.match(/\/explore\/([^/?#]+)/);
+        const m2 = href?.match(/\/user\/profile\/[^/]+\/([^/?#]+)/);
+        const nid = m1?.[1] || m2?.[1];
+        if (!nid || seenIds.has(nid)) return;
+        seenIds.add(nid);
+        if (link.closest(".note-item")?.querySelector(".xhs-card-extract")) return;
+        // 找卡片容器并创建按钮
+        let cardEl = link;
+        for (let i = 0; i < 5; i++) {
+          if (!cardEl.parentElement) break;
+          cardEl = cardEl.parentElement;
+          if (cardEl.classList?.contains("note-item") || getComputedStyle(cardEl).position !== "static") break;
+        }
+        const btn = document.createElement("div");
+        btn.className = "xhs-card-extract";
+        btn.setAttribute("data-nid", nid);
+        btn.textContent = "➕ 待提取";
+        btn.style.cssText = "position:absolute;top:8px;right:8px;z-index:99999;background:linear-gradient(135deg,#ffa502,#ff6348);color:white;border-radius:6px;padding:4px 8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;";
+        if (getComputedStyle(cardEl).position === "static") cardEl.style.position = "relative";
+        cardEl.appendChild(btn);
+      });
       const allBtns = Array.from(document.querySelectorAll('.xhs-card-extract'));
       allBtns.forEach(el => { el.style.pointerEvents = "none"; el.style.opacity = "0.3"; });
       const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
