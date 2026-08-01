@@ -748,7 +748,13 @@
   const cardBtnMap = new Map();
 
   function setCardBtnStatus(noteId, status, text) {
-    const btn = cardBtnMap.get(noteId);
+    // 优先从 Map 找，找不到则从 DOM 找
+    let btn = cardBtnMap.get(noteId);
+    if (!btn || !btn.isConnected) {
+      // 从 DOM 找包含 noteId 的 data 属性按钮
+      btn = document.querySelector(`.xhs-card-extract[data-nid="${noteId}"]`);
+      if (btn) cardBtnMap.set(noteId, btn);
+    }
     if (!btn) return;
     btn.textContent = text || status;
     const colors = {
@@ -802,6 +808,7 @@
       // 创建按钮
       const btn = document.createElement("div");
       btn.className = "xhs-card-extract";
+      btn.setAttribute("data-nid", noteId);
       btn.textContent = "➕ 待提取";
       btn.style.cssText = `
         position: absolute; top: 8px; right: 8px; z-index: 10;
