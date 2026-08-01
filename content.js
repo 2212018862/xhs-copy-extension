@@ -803,7 +803,7 @@
       for (let i = 0; i < 5; i++) {
         if (!cardEl.parentElement) break;
         cardEl = cardEl.parentElement;
-        if (getComputedStyle(cardEl).position !== "static") break;
+        if (cardEl.classList?.contains("note-item") || getComputedStyle(cardEl).position !== "static") break;
       }
 
       // 创建按钮
