@@ -767,7 +767,9 @@
   }
 
   function injectProfileButtonsInternal(noteList) {
+    console.log("[XHS-Copy] injectProfileButtonsInternal called, noteList:", noteList.length);
     const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
+    console.log("[XHS-Copy] noteLinks:", noteLinks.length);
     const processed = new Set();
 
     noteLinks.forEach(link => {
@@ -875,6 +877,7 @@
       }
       cardEl.appendChild(btn);
       if (!cardBtnMap.has(noteId)) cardBtnMap.set(noteId, btn);
+      console.log("[XHS-Copy] button created for:", noteId, "total:", cardBtnMap.size);
     });
 
     // 底部悬浮按钮：全部加入待提取
