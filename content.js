@@ -753,7 +753,7 @@
     let btn = cardBtnMap.get(noteId);
     if (!btn || !btn.isConnected) {
       // 从 DOM 找包含 noteId 的 data 属性按钮
-      const cardBtn = link.closest(".note-item")?.querySelector(".xhs-card-extract") || document.querySelector(`.xhs-card-extract[data-nid="${nid}"]`);
+      const cardBtn = link.parentElement?.querySelector(".xhs-card-extract") || link.parentElement?.parentElement?.querySelector(".xhs-card-extract") || document.querySelector(`.xhs-card-extract[data-nid="${nid}"]`);
       if (btn) cardBtnMap.set(noteId, btn);
     }
     if (!btn) return;
@@ -912,10 +912,12 @@
       // 先隐藏所有待提取按钮，改为显示排队状态
       document.querySelectorAll('.xhs-card-extract').forEach(el => {
         el.textContent = "⏳ 排队中";
-        el.style.background = "rgba(0,0,0,0.4)";
-        el.style.opacity = "1";
+            el.style.background = "rgba(0,0,0,0.25)";
+            el.style.opacity = "0.6";
             el.style.pointerEvents = "none";
             el.style.zIndex = "1";
+            el.style.fontSize = "11px";
+            el.style.padding = "3px 6px";
       });
 
 
