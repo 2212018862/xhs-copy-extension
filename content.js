@@ -749,6 +749,7 @@
   const cardBtnMap = new Map();
 
   function setCardBtnStatus(noteId, status, text) {
+    console.log("[XHS-Copy] setCardBtnStatus:", noteId, status);
     // 优先从 Map 找，找不到则从 DOM 找
     let btn = cardBtnMap.get(noteId);
     if (!btn || !btn.isConnected) {
