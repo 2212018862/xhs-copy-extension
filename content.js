@@ -911,8 +911,7 @@
       batchProcessing = true;
       // 按DOM顺序收集所有卡片按钮
       const allBtns = Array.from(document.querySelectorAll('.xhs-card-extract'));
-      // 所有按钮显示排队中
-      allBtns.forEach(el => { el.textContent = "⏳ 排队中"; el.style.background = "rgba(0,0,0,0.4)"; el.style.opacity = "0.7"; el.style.pointerEvents = "none"; });
+      allBtns.forEach(el => { el.style.pointerEvents = "none"; el.style.opacity = "0.3"; });
       const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
       const processed = new Set();
       const toExtract = [];
@@ -938,7 +937,7 @@
         done++;
         progressEl.textContent = `⏳ ${done}/${toExtract.length} 提取中...`;
         extractBtn.textContent = `⏳ ${done}/${toExtract.length}`;
-        if (btn) { btn.textContent = `⏳ ${done}/${toExtract.length}`; btn.style.background = "rgba(255,165,2,0.9)"; btn.style.opacity = "1"; }
+
 
         const token = item.xsecToken || "";
         const noteUrl = `https://www.xiaohongshu.com/explore/${nid}?xsec_token=${token}&xsec_source=pc_user`;
@@ -962,20 +961,20 @@
               noteQueue.push(data);
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
-            if (btn) { btn.textContent = "✅ 已提取"; btn.style.background = "rgba(46,213,115,0.9)"; btn.style.opacity = "1"; }
+
 
             const elapsed = Date.now() - extractStart;
             if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
-            if (btn) { btn.textContent = "⚠️ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; btn.style.opacity = "1"; }
+
 
             const elapsed2 = Date.now() - extractStart;
             if (elapsed2 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed2));
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
-          if (btn) { btn.textContent = "❌ 失败"; btn.style.background = "rgba(255,71,87,0.9)"; btn.style.opacity = "1"; }
+
 
           const elapsed3 = Date.now() - extractStart;
           if (elapsed3 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed3));
