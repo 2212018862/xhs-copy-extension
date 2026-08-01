@@ -848,7 +848,6 @@
 
         btn.textContent = "⏳ 提取中...";
         btn.style.background = "rgba(0,0,0,0.5)";
-        setCardBtnStatus(noteId, "提取中", "⏳ 提取中...");
 
         try {
           const response = await new Promise(resolve => {
@@ -865,19 +864,16 @@
             noteQueue.push(data);
             updateQueuePanel();
             showToast(`✅ 已加入：${data.title || "无标题"}`);
-            setCardBtnStatus(noteId, "已提取", "✅ 已提取");
             btn.textContent = "✅ 已提取";
             btn.style.background = "rgba(46,213,115,0.9)";
           } else {
             showToast("⚠️ 未提取到内容", false);
-            setCardBtnStatus(noteId, "失败", "➕ 待提取");
             btn.textContent = "➕ 待提取";
             btn.style.background = "rgba(255,165,2,0.9)";
           }
         } catch (err) {
           console.error("[XHS-Copy]", err);
           showToast("❌ 提取失败", false);
-          setCardBtnStatus(noteId, "失败", "➕ 待提取");
           btn.textContent = "➕ 待提取";
           btn.style.background = "rgba(255,165,2,0.9)";
         }
