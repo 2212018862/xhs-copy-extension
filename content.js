@@ -725,6 +725,7 @@
   // ══════════════════════════════════════════
 
   let profileTimer = null;
+  let batchProcessing = false;
   function injectProfileButtons() {
     if (!/\/user\/profile\//.test(location.href)) return;
     if (profileTimer) return;
@@ -767,6 +768,7 @@
   }
 
   function injectProfileButtonsInternal(noteList) {
+    if (batchProcessing) return; // 批量处理中不重建按钮
     console.log("[XHS-Copy] injectProfileButtonsInternal called, noteList:", noteList.length);
     const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
     console.log("[XHS-Copy] noteLinks:", noteLinks.length);
@@ -906,6 +908,7 @@
       stopBtn.style.display = "block";
       progressEl.style.display = "block";
       stopped = false;
+      batchProcessing = true;
       // 先隐藏所有待提取按钮，改为显示排队状态
       document.querySelectorAll('.xhs-card-extract').forEach(el => {
         el.textContent = "⏳ 排队中";
@@ -986,8 +989,10 @@
       stopBtn.style.display = "none";
       if (!stopped) {
         progressEl.textContent = `✅ 完成！共提取 ${noteQueue.length} 篇`;
+        batchProcessing = false;
       } else {
         progressEl.textContent = `⏹ 已停止，已提取 ${noteQueue.length} 篇`;
+        batchProcessing = false;
       }
     });
   }
