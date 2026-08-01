@@ -906,6 +906,14 @@
       stopBtn.style.display = "block";
       progressEl.style.display = "block";
       stopped = false;
+      // 先隐藏所有待提取按钮，改为显示排队状态
+      document.querySelectorAll('.xhs-card-extract').forEach(el => {
+        el.textContent = "⏳ 排队中";
+        el.style.background = "rgba(0,0,0,0.4)";
+        el.style.opacity = "1";
+        el.style.pointerEvents = "none";
+      });
+
 
       const noteLinks = document.querySelectorAll('a[href*="/explore/"], a[href*="/user/profile/"]');
       const processed = new Set();
