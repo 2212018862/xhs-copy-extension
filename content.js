@@ -924,6 +924,9 @@
         const token = item.xsecToken || "";
         const noteUrl = `https://www.xiaohongshu.com/explore/${nid}?xsec_token=${token}&xsec_source=pc_user`;
 
+        const extractStart = Date.now();
+
+
         try {
           const response = await new Promise(resolve => {
             try {
@@ -941,13 +944,19 @@
             }
             progressEl.textContent = `✅ ${done}/${toExtract.length} 已加入：${data.title || "无标题"}`;
             setCardBtnStatus(nid, "已提取", "✅ 已提取");
+            const elapsed = Date.now() - extractStart;
+            if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
           } else {
             progressEl.textContent = `⚠️ ${done}/${toExtract.length} 未提取到：${item.title || nid}`;
             setCardBtnStatus(nid, "失败", "⚠️ 失败");
+            const elapsed2 = Date.now() - extractStart;
+            if (elapsed2 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed2));
           }
         } catch (err) {
           progressEl.textContent = `❌ ${done}/${toExtract.length} 失败`;
           setCardBtnStatus(nid, "失败", "❌ 失败");
+          const elapsed3 = Date.now() - extractStart;
+          if (elapsed3 < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed3));
         }
         updateQueuePanel();
       }
