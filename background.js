@@ -42,7 +42,7 @@ function doExtract(url) {
                 if (!n || (d?.note?.noteId && d.note.noteId !== id)) return { ready: false };
 
                 const imgs = (n.imageList||[]).map(i=>{const u=i?.urlDefault||i?.urlPre||i?.url||"";return u.startsWith("//")?"https:"+u:u}).filter(Boolean);
-                let vid=""; const s=n?.video?.media?.stream; if(s){const h=s.h264||s.h265||[];if(h.length>0)vid=h[0].masterUrl||"";}
+                let vid=""; const s=n?.video?.media?.stream; if(s){for(const k of Object.keys(s)){const arr=s[k];if(Array.isArray(arr)&&arr.length>0&&arr[0].masterUrl){vid=arr[0].masterUrl;break;}}}
 
                 // 评论：先从 state 取
                 const c=[]; const cm=state?.comment?.commentMap||{}; for(const v of Object.values(cm)){if(v.content)c.push({user:v.userInfo?.nickname||"",content:v.content,likes:v.likeCount||0});}
