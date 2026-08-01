@@ -909,10 +909,12 @@
       progressEl.style.display = "block";
       stopped = false;
       batchProcessing = true;
-      // 批量处理期间禁用所有卡片按钮
-      document.querySelectorAll('.xhs-card-extract').forEach(el => {
+      // 所有按钮显示排队中
+      allBtns.forEach(el => {
+        el.textContent = "⏳ 排队中";
+        el.style.background = "rgba(0,0,0,0.4)";
+        el.style.opacity = "0.7";
         el.style.pointerEvents = "none";
-        el.style.opacity = "0.4";
       });
 
 
@@ -994,11 +996,11 @@
       if (!stopped) {
         progressEl.textContent = `✅ 完成！共提取 ${noteQueue.length} 篇`;
         batchProcessing = false;
-        document.querySelectorAll('.xhs-card-extract').forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
+        allBtns.forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
       } else {
         progressEl.textContent = `⏹ 已停止，已提取 ${noteQueue.length} 篇`;
         batchProcessing = false;
-        document.querySelectorAll('.xhs-card-extract').forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
+        allBtns.forEach(el => { el.style.pointerEvents = ""; el.style.opacity = ""; });
       }
     });
   }
