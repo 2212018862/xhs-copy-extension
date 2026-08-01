@@ -698,8 +698,11 @@
   function onUrlChange() {
     if (location.href === lastUrl) return;
     lastUrl = location.href;
-    const old = document.getElementById(BUTTON_ID)?.parentElement;
-    if (old) old.remove();
+    // 清理笔记详情页按钮
+    document.getElementById(BUTTON_ID)?.parentElement?.remove();
+    document.getElementById(DL_BTN_ID)?.parentElement?.remove();
+    document.getElementById(ADD_BTN_ID)?.parentElement?.remove();
+    // 清理作者首页悬浮元素
     document.getElementById("xhs-profile-all")?.remove();
     document.querySelector(".xhs-queue-panel")?.remove();
     batchProcessing = false;
@@ -731,10 +734,13 @@
   let batchProcessing = false;
   function injectProfileButtons() {
     if (!/\/user\/profile\//.test(location.href)) {
-      // 不在作者首页，清理残留元素
       document.getElementById("xhs-profile-all")?.remove();
       return;
     }
+    // 在作者首页，清理笔记详情页泄漏的按钮
+    document.getElementById(BUTTON_ID)?.parentElement?.remove();
+    document.getElementById(DL_BTN_ID)?.parentElement?.remove();
+    document.getElementById(ADD_BTN_ID)?.parentElement?.remove();
     if (profileTimer) return;
     profileTimer = setTimeout(() => { profileTimer = null; }, 2000);
 
