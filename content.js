@@ -847,7 +847,9 @@
         }
 
         btn.textContent = "⏳ 提取中...";
-        btn.style.background = "rgba(0,0,0,0.5)";
+        btn.style.background = "rgba(255,165,2,0.95)";
+        btn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.5)";
+        btn.style.zIndex = "999999";
 
         try {
           const response = await new Promise(resolve => {
