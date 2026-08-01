@@ -914,7 +914,8 @@
         el.textContent = "⏳ 排队中";
         el.style.background = "rgba(0,0,0,0.4)";
         el.style.opacity = "1";
-        el.style.pointerEvents = "none";
+            el.style.pointerEvents = "none";
+            el.style.zIndex = "1";
       });
 
 
