@@ -1110,7 +1110,12 @@
 
   new MutationObserver(() => {
     if (/\/explore\/|\/discovery\/item\//.test(location.href) && !document.getElementById(BUTTON_ID)) tryInject();
-    if (/\/user\/profile\//.test(location.href)) injectProfileButtons();
+    if (/\/user\/profile\//.test(location.href)) {
+      injectProfileButtons();
+    } else {
+      // 离开作者首页，清理悬浮按钮
+      document.getElementById("xhs-profile-all")?.remove();
+    }
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   setTimeout(tryInject, 1500);
