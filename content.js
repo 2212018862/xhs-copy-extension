@@ -1325,7 +1325,7 @@
         <div style="margin-bottom:10px;">
           <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">提示词（告诉大模型你要什么样的笔记）</label>
           <textarea id="xhs-llm-prompt" placeholder="例如：只要笔记内容大于50字的笔记" rows="3"
-            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;" />
+            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;"></textarea>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:12px;">
           <div style="flex:1;">
