@@ -1179,7 +1179,7 @@
 
   function injectSearchExtractBtn() {
     if (document.getElementById("xhs-search-extract-btn")) return;
-    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
+    if (!/^\/?$|^\/explore/.test(location.pathname)) return;
 
     const btn = createSearchBtn();
     if (!btn) return;
@@ -1345,7 +1345,7 @@
 
   // 搜索页按钮管理
   function manageSearchBtn() {
-    if (!/^\/?$|^\/explore/.test(location.pathname)) return;
+    if (/^\/?$|^\/explore/.test(location.pathname)) {
       if (!document.getElementById("xhs-search-extract-btn")) injectSearchExtractBtn();
     } else {
       document.getElementById("xhs-search-extract-btn")?.remove();
