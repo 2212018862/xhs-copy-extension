@@ -1182,36 +1182,17 @@
     const btn = createSearchBtn();
     if (!btn) return;
 
-    // 布局1：顶部展开态（大搜索框）
+    // 找搜索栏
     const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
-    if (searchBar) {
-      // 找到搜索栏最外层包裹容器（搜索框+搜索图标那一行）
-      let wrapper = searchBar;
-      for (let i = 0; i < 5; i++) {
-        if (!wrapper.parentElement) break;
-        wrapper = wrapper.parentElement;
-        // 找到包含搜索图标的那一层
-        if (wrapper.querySelector('[class*="search-icon"], svg, [class*="icon-search"]')) break;
-      }
-      if (getComputedStyle(wrapper).position === "static") wrapper.style.position = "relative";
-      if (getComputedStyle(wrapper).display === "flex" || getComputedStyle(wrapper).display === "inline-flex") {
-        wrapper.appendChild(btn);
-      } else {
-        // 包一层flex
-        wrapper.style.display = "flex";
-        wrapper.style.alignItems = "center";
-        wrapper.appendChild(btn);
-      }
-      return;
-    }
+    if (!searchBar) return;
 
-    // 布局2：滚动后紧凑态
-    const compactBar = document.querySelector('[class*="search-bar"], [class*="search-wrapper"]');
-    if (compactBar) {
-      compactBar.style.display = "flex";
-      compactBar.style.alignItems = "center";
-      compactBar.appendChild(btn);
-    }
+    // 直接用 fixed 定位放到搜索栏右边，不依赖父容器
+    const searchRect = searchBar.getBoundingClientRect();
+    btn.style.position = "fixed";
+    btn.style.top = (searchRect.top + searchRect.height / 2 - 16) + "px";
+    btn.style.left = (searchRect.right + 12) + "px";
+    btn.style.zIndex = "999999";
+    document.body.appendChild(btn);
   }
 
   function toggleSearchPanel() {
