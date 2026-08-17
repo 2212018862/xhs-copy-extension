@@ -1182,11 +1182,11 @@
     const btn = createSearchBtn();
     if (!btn) return;
 
-    // 找搜索栏
-    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
+    // 找搜索栏（兼容两种布局）
+    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input, [class*=\"search-input\"]");
     if (!searchBar) return;
 
-    // 找搜索栏的直接父容器（input-box）
+    // 找搜索栏的直接父容器
     const container = searchBar.parentElement;
     if (!container) return;
 
@@ -1199,6 +1199,14 @@
     wrapper.appendChild(searchBar);
     wrapper.appendChild(btn);
   }
+
+  // 页面滚动时重新检测并注入
+  window.addEventListener("scroll", () => {
+    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
+    if (!document.getElementById("xhs-search-extract-btn")) {
+      setTimeout(injectSearchExtractBtn, 100);
+    }
+  }, { passive: true });
 
   function toggleSearchPanel() {
     let panel = document.getElementById("xhs-search-panel");
