@@ -1349,16 +1349,21 @@
     }
   }
 
-  // 注入搜索提取按钮
-  setInterval(() => {
+  // 监听搜索栏出现后注入按钮
+  const searchObserver = new MutationObserver(() => {
     if (!/\/$|\/search_result|\/explore/.test(location.pathname)) {
       document.getElementById("xhs-search-extract-btn")?.remove();
       return;
     }
     if (!document.getElementById("xhs-search-extract-btn")) {
-      injectSearchExtractBtn();
+      const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
+      if (searchBar) injectSearchExtractBtn();
     }
-  }, 2000);
+  });
+  searchObserver.observe(document.documentElement, { childList: true, subtree: true });
+  // 兜底：延迟尝试
+  setTimeout(injectSearchExtractBtn, 3000);
+  setTimeout(injectSearchExtractBtn, 5000);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
