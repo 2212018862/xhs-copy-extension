@@ -1365,9 +1365,11 @@
 
   // 搜索页自动应用筛选条件
   let filterApplied = false;
+  let filterTimer2 = null;
   function tryApplySearchFilters() {
-    if (filterApplied) return;
+    if (filterTimer2) return;
     if (!/\/search_result/.test(location.pathname)) { filterApplied = false; return; }
+    filterTimer2 = setTimeout(() => { filterTimer2 = null; }, 3000);
 
     chrome.storage.local.get("xhs_search_filters", (result) => {
       const filters = result.xhs_search_filters;
@@ -1430,7 +1432,7 @@
   // 在 MutationObserver 里也调用
   new MutationObserver(() => {
     tryInjectSearchBtn();
-    tryApplySearchFilters();
+    if (/\/search_result/.test(location.pathname)) tryApplySearchFilters();
   }).observe(document.documentElement, { childList: true, subtree: true });
 
   setTimeout(tryInjectSearchBtn, 1500);
