@@ -1311,21 +1311,12 @@
       </button>
 
       <div style="border-top:1px solid #333;padding-top:16px;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">🤖 大模型配置</div>
-        <div style="margin-bottom:10px;">
-          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">API Key</label>
-          <input id="xhs-llm-apikey" type="password" placeholder="sk-..."
-            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
-        </div>
-        <div style="margin-bottom:10px;">
-          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">Base URL</label>
-          <input id="xhs-llm-baseurl" type="text" placeholder="https://api.openai.com/v1"
-            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
-        </div>
-        <div style="margin-bottom:10px;">
-          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">模型</label>
-          <input id="xhs-llm-model" type="text" placeholder="gpt-4o-mini"
-            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:14px;font-weight:600;">🤖 大模型配置</div>
+          <div id="xhs-llm-status" style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#aaa;">加载中...</span>
+            <div id="xhs-llm-modify" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;background:#333;color:#aaa;display:none;">修改</div>
+          </div>
         </div>
       </div>
 
@@ -1351,13 +1342,108 @@
     `;
     document.body.appendChild(panel);
 
-    // 加载保存的LLM配置
-    chrome.storage.local.get("xhs_llm_config", (result) => {
-      const cfg = result.xhs_llm_config || {};
-      if (cfg.apikey) panel.querySelector("#xhs-llm-apikey").value = cfg.apikey;
-      if (cfg.baseurl) panel.querySelector("#xhs-llm-baseurl").value = cfg.baseurl;
-      if (cfg.model) panel.querySelector("#xhs-llm-model").value = cfg.model;
-    });
+    // 加载LLM配置状态
+    function updateLLMStatus() {
+      chrome.storage.local.get("xhs_llm_config", (result) => {
+        const cfg = result.xhs_llm_config || {};
+        const statusEl = panel.querySelector("#xhs-llm-status");
+        const isConfigured = cfg.apikey && cfg.baseurl && cfg.model;
+        statusEl.innerHTML = isConfigured
+          ? `<span style="font-size:12px;color:#2ecc71;">✅ 已配置 (${cfg.model})</span><div id="xhs-llm-modify" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;background:#333;color:#aaa;">修改</div>`
+          : `<span style="font-size:12px;color:#e74c3c;">❌ 未配置</span><div id="xhs-llm-modify" style="padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;background:#667eea;color:#fff;">配置</div>`;
+        statusEl.querySelector("#xhs-llm-modify").addEventListener("click", () => openLLMModal());
+      });
+    }
+    updateLLMStatus();
+
+    // LLM配置弹窗
+    function openLLMModal() {
+      let modal = document.getElementById("xhs-llm-modal");
+      if (modal) { modal.remove(); return; }
+
+      chrome.storage.local.get("xhs_llm_config", (result) => {
+        const cfg = result.xhs_llm_config || {};
+
+        modal = document.createElement("div");
+        modal.id = "xhs-llm-modal";
+        modal.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+        modal.innerHTML = `
+          <div style="background:#1a1a2e;border-radius:16px;padding:24px;width:400px;max-width:90vw;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;">
+            <h3 style="margin:0 0 16px;font-size:16px;">🤖 大模型配置</h3>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">API Key</label>
+              <input id="xhs-modal-apikey" type="password" value="${cfg.apikey || ""}" placeholder="sk-..."
+                style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+            </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">Base URL</label>
+              <input id="xhs-modal-baseurl" type="text" value="${cfg.baseurl || ""}" placeholder="https://api.openai.com/v1"
+                style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">模型</label>
+              <input id="xhs-modal-model" type="text" value="${cfg.model || ""}" placeholder="gpt-4o-mini"
+                style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+            </div>
+            <div id="xhs-modal-msg" style="margin-bottom:12px;font-size:12px;text-align:center;min-height:18px;"></div>
+            <div style="display:flex;gap:10px;">
+              <button id="xhs-modal-cancel" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:transparent;color:#aaa;font-size:13px;cursor:pointer;">取消</button>
+              <button id="xhs-modal-verify" style="flex:1;padding:10px;border-radius:8px;border:1px solid #667eea;background:transparent;color:#667eea;font-size:13px;cursor:pointer;">验证可用</button>
+              <button id="xhs-modal-save" style="flex:1;padding:10px;border-radius:8px;border:none;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">保存</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+
+        // 关闭
+        modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+        modal.querySelector("#xhs-modal-cancel").addEventListener("click", () => modal.remove());
+
+        // 保存
+        modal.querySelector("#xhs-modal-save").addEventListener("click", () => {
+          const newCfg = {
+            apikey: modal.querySelector("#xhs-modal-apikey").value.trim(),
+            baseurl: modal.querySelector("#xhs-modal-baseurl").value.trim().replace(/\/$/, ""),
+            model: modal.querySelector("#xhs-modal-model").value.trim(),
+          };
+          if (!newCfg.apikey || !newCfg.baseurl || !newCfg.model) {
+            modal.querySelector("#xhs-modal-msg").innerHTML = '<span style="color:#e74c3c;">请填写完整信息</span>';
+            return;
+          }
+          chrome.storage.local.set({ xhs_llm_config: newCfg }, () => {
+            modal.querySelector("#xhs-modal-msg").innerHTML = '<span style="color:#2ecc71;">✅ 已保存</span>';
+            setTimeout(() => { modal.remove(); updateLLMStatus(); }, 800);
+          });
+        });
+
+        // 验证
+        modal.querySelector("#xhs-modal-verify").addEventListener("click", async () => {
+          const apikey = modal.querySelector("#xhs-modal-apikey").value.trim();
+          const baseurl = modal.querySelector("#xhs-modal-baseurl").value.trim().replace(/\/$/, "");
+          const model = modal.querySelector("#xhs-modal-model").value.trim();
+          const msgEl = modal.querySelector("#xhs-modal-msg");
+
+          if (!apikey || !baseurl || !model) { msgEl.innerHTML = '<span style="color:#e74c3c;">请填写完整信息</span>'; return; }
+
+          msgEl.innerHTML = '<span style="color:#aaa;">⏳ 验证中...</span>';
+          try {
+            const resp = await fetch(`${baseurl}/chat/completions`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apikey}` },
+              body: JSON.stringify({ model, messages: [{ role: "user", content: "hi" }], max_tokens: 5 }),
+            });
+            if (resp.ok) {
+              msgEl.innerHTML = '<span style="color:#2ecc71;">✅ 可用！</span>';
+            } else {
+              const err = await resp.text();
+              msgEl.innerHTML = `<span style="color:#e74c3c;">❌ ${resp.status}: ${err.substring(0, 80)}</span>`;
+            }
+          } catch (err) {
+            msgEl.innerHTML = `<span style="color:#e74c3c;">❌ 连接失败: ${err.message}</span>`;
+          }
+        });
+      });
+    }
 
     // 注入筛选样式
     if (!document.getElementById("xhs-search-panel-css")) {
@@ -1414,9 +1500,10 @@
       const keyword = panel.querySelector("#xhs-search-keyword").value.trim();
       if (!keyword) { showToast("请输入搜索关键词", false); return; }
 
-      const apikey = panel.querySelector("#xhs-llm-apikey").value.trim();
-      const baseurl = panel.querySelector("#xhs-llm-baseurl").value.trim().replace(/\/$/, "");
-      const model = panel.querySelector("#xhs-llm-model").value.trim();
+      const cfg = await new Promise(resolve => chrome.storage.local.get("xhs_llm_config", r => resolve(r.xhs_llm_config || {})));
+      const apikey = cfg.apikey || "";
+      const baseurl = cfg.baseurl || "";
+      const model = cfg.model || "";
       const prompt = panel.querySelector("#xhs-llm-prompt").value.trim();
       const count = parseInt(panel.querySelector("#xhs-llm-count").value) || 3;
 
