@@ -1343,7 +1343,7 @@
 
   // 创建搜索按钮并监控存活
   function keepSearchBtnAlive() {
-    if (location.pathname !== "/") return;
+    if (!location.pathname.includes("search_result")) return;
     if (!document.getElementById("xhs-search-extract-btn")) {
       injectSearchExtractBtn();
     }
