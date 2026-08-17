@@ -1154,4 +1154,207 @@
 
   setTimeout(tryInject, 1500);
   setTimeout(injectProfileButtons, 1500);
+
+  // ══════════════════════════════════════════
+  //  搜索提取功能：在搜索栏旁加按钮
+  // ══════════════════════════════════════════
+  function injectSearchExtractBtn() {
+    if (document.getElementById("xhs-search-extract-btn")) return;
+    // 只在首页/搜索页注入
+    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
+
+    // 找搜索栏容器
+    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
+    if (!searchBar) return;
+
+    // 创建按钮
+    const btn = document.createElement("div");
+    btn.id = "xhs-search-extract-btn";
+    btn.textContent = "🔍 搜索提取";
+    btn.style.cssText = `
+      position: absolute; right: -110px; top: 50%; transform: translateY(-50%);
+      padding: 6px 14px; background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border-radius: 20px; font-size: 13px; font-weight: 600;
+      cursor: pointer; z-index: 999999; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(102,126,234,0.4);
+      transition: all 0.2s;
+    `;
+    btn.addEventListener("mouseenter", () => { btn.style.transform = "translateY(-50%) scale(1.05)"; });
+    btn.addEventListener("mouseleave", () => { btn.style.transform = "translateY(-50%)"; });
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleSearchPanel();
+    });
+
+    // 确保父容器有 position:relative
+    const parent = searchBar.parentElement;
+    if (parent && getComputedStyle(parent).position === "static") {
+      parent.style.position = "relative";
+    }
+    (parent || searchBar).appendChild(btn);
+  }
+
+  function toggleSearchPanel() {
+    let panel = document.getElementById("xhs-search-panel");
+    if (panel) { panel.remove(); return; }
+
+    panel = document.createElement("div");
+    panel.id = "xhs-search-panel";
+    panel.style.cssText = `
+      position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 9999999; background: #1a1a2e; border-radius: 16px; padding: 24px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4); width: 480px; max-width: 90vw;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #fff;
+    `;
+
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:18px;">🔍 搜索提取配置</h3>
+        <div id="xhs-search-close" style="cursor:pointer;font-size:20px;opacity:0.7;padding:4px 8px;">✕</div>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <label style="display:block;margin-bottom:6px;font-size:13px;color:#aaa;">搜索关键词</label>
+        <input id="xhs-search-keyword" type="text" placeholder="输入搜索关键词..."
+          style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid #333;background:#16213e;color:#fff;font-size:14px;box-sizing:border-box;outline:none;" />
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:13px;color:#aaa;margin-bottom:6px;">排序依据</div>
+        <div class="xhs-filter-row" data-filter="sort">
+          <div class="xhs-filter-item active" data-value="">综合</div>
+          <div class="xhs-filter-item" data-value="time_descending">最新</div>
+          <div class="xhs-filter-item" data-value="popularity_descending">最多点赞</div>
+          <div class="xhs-filter-item" data-value="comment">最多评论</div>
+          <div class="xhs-filter-item" data-value="collect">最多收藏</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:13px;color:#aaa;margin-bottom:6px;">笔记类型</div>
+        <div class="xhs-filter-row" data-filter="noteType">
+          <div class="xhs-filter-item active" data-value="">不限</div>
+          <div class="xhs-filter-item" data-value="video">视频</div>
+          <div class="xhs-filter-item" data-value="normal">图文</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:13px;color:#aaa;margin-bottom:6px;">发布时间</div>
+        <div class="xhs-filter-row" data-filter="timeRange">
+          <div class="xhs-filter-item active" data-value="">不限</div>
+          <div class="xhs-filter-item" data-value="1">一天内</div>
+          <div class="xhs-filter-item" data-value="2">一周内</div>
+          <div class="xhs-filter-item" data-value="3">半年内</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:13px;color:#aaa;margin-bottom:6px;">搜索范围</div>
+        <div class="xhs-filter-row" data-filter="scope">
+          <div class="xhs-filter-item active" data-value="">不限</div>
+          <div class="xhs-filter-item" data-value="viewed">已看过</div>
+          <div class="xhs-filter-item" data-value="unviewed">未看过</div>
+          <div class="xhs-filter-item" data-value="followed">已关注</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:13px;color:#aaa;margin-bottom:6px;">位置距离</div>
+        <div class="xhs-filter-row" data-filter="location">
+          <div class="xhs-filter-item active" data-value="">不限</div>
+          <div class="xhs-filter-item" data-value="same_city">同城</div>
+          <div class="xhs-filter-item" data-value="nearby">附近</div>
+        </div>
+      </div>
+
+      <button id="xhs-search-start" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;">
+        开始搜索
+      </button>
+    `;
+    document.body.appendChild(panel);
+
+    // 注入筛选样式
+    if (!document.getElementById("xhs-search-panel-css")) {
+      const style = document.createElement("style");
+      style.id = "xhs-search-panel-css";
+      style.textContent = `
+        .xhs-filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .xhs-filter-item {
+          padding: 6px 14px; border-radius: 16px; font-size: 13px; cursor: pointer;
+          background: #16213e; color: #aaa; border: 1px solid #333; transition: all 0.2s;
+          user-select: none;
+        }
+        .xhs-filter-item:hover { border-color: #667eea; color: #fff; }
+        .xhs-filter-item.active { background: #e74c3c; color: #fff; border-color: #e74c3c; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // 事件绑定
+    panel.querySelector("#xhs-search-close").addEventListener("click", () => panel.remove());
+
+    // 筛选项点击
+    panel.querySelectorAll(".xhs-filter-row").forEach(row => {
+      row.querySelectorAll(".xhs-filter-item").forEach(item => {
+        item.addEventListener("click", () => {
+          row.querySelectorAll(".xhs-filter-item").forEach(i => i.classList.remove("active"));
+          item.classList.add("active");
+        });
+      });
+    });
+
+    // 开始搜索
+    panel.querySelector("#xhs-search-start").addEventListener("click", () => {
+      const keyword = panel.querySelector("#xhs-search-keyword").value.trim();
+      if (!keyword) { showToast("请输入搜索关键词", false); return; }
+
+      const filters = {};
+      panel.querySelectorAll(".xhs-filter-row").forEach(row => {
+        const filterName = row.dataset.filter;
+        const activeItem = row.querySelector(".xhs-filter-item.active");
+        filters[filterName] = activeItem?.dataset.value || "";
+      });
+
+      // 构建搜索URL
+      const params = new URLSearchParams();
+      params.set("keyword", keyword);
+      params.set("source", "web_search_result_notes");
+      if (filters.sort) params.set("sort", filters.sort);
+      if (filters.noteType) params.set("type", filters.noteType);
+      if (filters.timeRange) params.set("ext_flags", filters.timeRange);
+      if (filters.scope) params.set("scope", filters.scope);
+      if (filters.location) params.set("location", filters.location);
+
+      const url = `https://www.xiaohongshu.com/search_result?${params.toString()}`;
+      window.location.href = url;
+      panel.remove();
+    });
+
+    // 点击面板外部关闭
+    const closeHandler = (e) => {
+      if (!panel.contains(e.target) && e.target.id !== "xhs-search-extract-btn") {
+        panel.remove();
+        document.removeEventListener("click", closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener("click", closeHandler), 100);
+  }
+
+  // 注入搜索提取按钮
+  function tryInjectSearchBtn() {
+    if (document.getElementById("xhs-search-extract-btn")) return;
+    if (/\/$|\/search_result|\/explore/.test(location.pathname)) {
+      injectSearchExtractBtn();
+    }
+  }
+
+  // 在 MutationObserver 里也调用
+  new MutationObserver(() => {
+    tryInjectSearchBtn();
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
+  setTimeout(tryInjectSearchBtn, 1500);
 })();
