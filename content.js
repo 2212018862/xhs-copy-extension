@@ -1341,24 +1341,24 @@
     }
   }
 
-  // 快速轮询注入搜索按钮（前5秒每500ms，之后每2秒）
-  let searchPollCount = 0;
-  const searchPoll = setInterval(() => {
-    searchPollCount++;
+  // 只创建一次搜索按钮
+  let searchBtnCreated = false;
+  function ensureSearchBtn() {
+    if (searchBtnCreated && document.getElementById("xhs-search-extract-btn")) return;
     if (location.pathname !== "/") {
       document.getElementById("xhs-search-extract-btn")?.remove();
+      searchBtnCreated = false;
       return;
     }
     if (!document.getElementById("xhs-search-extract-btn")) {
       injectSearchExtractBtn();
+      searchBtnCreated = !!document.getElementById("xhs-search-extract-btn");
     }
-    if (searchPollCount > 10) clearInterval(searchPoll); // 5秒后停止快速轮询
-  }, 500);
-  // 慢速轮询兜底
-  setInterval(() => {
-    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
-    if (!document.getElementById("xhs-search-extract-btn")) injectSearchExtractBtn();
-  }, 3000);
+  }
+  ensureSearchBtn();
+  setTimeout(ensureSearchBtn, 1000);
+  setTimeout(ensureSearchBtn, 2000);
+  setTimeout(ensureSearchBtn, 3000);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
