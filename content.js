@@ -1357,4 +1357,70 @@
   new MutationObserver(manageSearchBtn).observe(document.body, { childList: true, subtree: true });
 
   setTimeout(tryInjectSearchBtn, 1500);
+
+  // ══════════════════════════════════════════
+  //  搜索结果页：自动应用筛选条件
+  // ══════════════════════════════════════════
+  let filterApplied = false;
+  function tryApplySearchFilters() {
+    if (filterApplied) return;
+    if (!location.pathname.includes("search_result")) return;
+
+    chrome.storage.local.get("xhs_search_filters", (result) => {
+      const filters = result.xhs_search_filters;
+      if (!filters || Object.values(filters).every(v => !v)) return;
+
+      // 找"筛选"按钮并点击
+      const allEls = document.querySelectorAll("span, div, button");
+      let filterBtn = null;
+      for (const el of allEls) {
+        if (el.textContent?.trim() === "筛选" && el.offsetParent !== null) {
+          filterBtn = el;
+          break;
+        }
+      }
+      if (!filterBtn) return;
+
+      filterBtn.click();
+      filterApplied = true;
+
+      // 等面板弹出后点击对应选项
+      setTimeout(() => {
+        const filterMap = {
+          sort: { time_descending: "最新", popularity_descending: "最多点赞", comment: "最多评论", collect: "最多收藏" },
+          noteType: { video: "视频", normal: "图文" },
+          timeRange: { "1": "一天内", "2": "一周内", "3": "半年内" },
+          scope: { viewed: "已看过", unviewed: "未看过", followed: "已关注" },
+          location: { same_city: "同城", nearby: "附近" },
+        };
+
+        for (const [key, value] of Object.entries(filters)) {
+          if (!value || !filterMap[key]?.[value]) continue;
+          const targetText = filterMap[key][value];
+          const items = document.querySelectorAll("[class*='item'], [class*='tag'], [class*='btn'], [class*='option'], span, div");
+          for (const item of items) {
+            if (item.textContent?.trim() === targetText && item.offsetParent !== null) {
+              item.click();
+              break;
+            }
+          }
+        }
+
+        chrome.storage.local.remove("xhs_search_filters");
+
+        setTimeout(() => {
+          const collapseBtn = Array.from(document.querySelectorAll("span, div, button")).find(
+            el => el.textContent?.trim() === "收起" || el.textContent?.trim() === "确认"
+          );
+          if (collapseBtn) collapseBtn.click();
+        }, 500);
+      }, 1500);
+    });
+  }
+
+  // 搜索结果页监听
+  new MutationObserver(() => {
+    if (location.pathname.includes("search_result")) tryApplySearchFilters();
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(tryApplySearchFilters, 3000);
 })();
