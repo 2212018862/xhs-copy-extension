@@ -1240,7 +1240,7 @@
     panel.style.cssText = `
       position: fixed; top: 80px; left: 50%; transform: translateX(-50%);
       z-index: 9999999; background: #1a1a2e; border-radius: 16px; padding: 24px;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.4); width: 480px; max-width: 90vw;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.4); width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       color: #fff;
     `;
