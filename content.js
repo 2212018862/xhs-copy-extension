@@ -1158,41 +1158,60 @@
   // ══════════════════════════════════════════
   //  搜索提取功能：在搜索栏旁加按钮
   // ══════════════════════════════════════════
-  function injectSearchExtractBtn() {
-    if (document.getElementById("xhs-search-extract-btn")) return;
-    // 只在首页/搜索页注入
-    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
-
-    // 找搜索栏容器
-    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
-    if (!searchBar) return;
-
-    // 创建按钮
+  function createSearchBtn() {
+    if (document.getElementById("xhs-search-extract-btn")) return null;
     const btn = document.createElement("div");
     btn.id = "xhs-search-extract-btn";
     btn.textContent = "🔍 搜索提取";
     btn.style.cssText = `
-      position: absolute; right: -110px; top: 50%; transform: translateY(-50%);
       padding: 6px 14px; background: linear-gradient(135deg, #667eea, #764ba2);
       color: white; border-radius: 20px; font-size: 13px; font-weight: 600;
-      cursor: pointer; z-index: 999999; white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(102,126,234,0.4);
-      transition: all 0.2s;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(102,126,234,0.4); transition: all 0.2s;
     `;
-    btn.addEventListener("mouseenter", () => { btn.style.transform = "translateY(-50%) scale(1.05)"; });
-    btn.addEventListener("mouseleave", () => { btn.style.transform = "translateY(-50%)"; });
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleSearchPanel();
-    });
+    btn.addEventListener("mouseenter", () => { btn.style.transform = "scale(1.05)"; });
+    btn.addEventListener("mouseleave", () => { btn.style.transform = "scale(1)"; });
+    btn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); toggleSearchPanel(); });
+    return btn;
+  }
 
-    // 确保父容器有 position:relative
-    const parent = searchBar.parentElement;
-    if (parent && getComputedStyle(parent).position === "static") {
-      parent.style.position = "relative";
+  function injectSearchExtractBtn() {
+    if (document.getElementById("xhs-search-extract-btn")) return;
+    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
+
+    const btn = createSearchBtn();
+    if (!btn) return;
+
+    // 布局1：顶部展开态（大搜索框）
+    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
+    if (searchBar) {
+      // 找到搜索栏最外层包裹容器（搜索框+搜索图标那一行）
+      let wrapper = searchBar;
+      for (let i = 0; i < 5; i++) {
+        if (!wrapper.parentElement) break;
+        wrapper = wrapper.parentElement;
+        // 找到包含搜索图标的那一层
+        if (wrapper.querySelector('[class*="search-icon"], svg, [class*="icon-search"]')) break;
+      }
+      if (getComputedStyle(wrapper).position === "static") wrapper.style.position = "relative";
+      if (getComputedStyle(wrapper).display === "flex" || getComputedStyle(wrapper).display === "inline-flex") {
+        wrapper.appendChild(btn);
+      } else {
+        // 包一层flex
+        wrapper.style.display = "flex";
+        wrapper.style.alignItems = "center";
+        wrapper.appendChild(btn);
+      }
+      return;
     }
-    (parent || searchBar).appendChild(btn);
+
+    // 布局2：滚动后紧凑态
+    const compactBar = document.querySelector('[class*="search-bar"], [class*="search-wrapper"]');
+    if (compactBar) {
+      compactBar.style.display = "flex";
+      compactBar.style.alignItems = "center";
+      compactBar.appendChild(btn);
+    }
   }
 
   function toggleSearchPanel() {
