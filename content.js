@@ -1345,7 +1345,7 @@
 
   // 搜索页按钮管理
   function manageSearchBtn() {
-    if (location.pathname !== "/") return;
+    if (!/^\/?$|^\/explore/.test(location.pathname)) return;
       if (!document.getElementById("xhs-search-extract-btn")) injectSearchExtractBtn();
     } else {
       document.getElementById("xhs-search-extract-btn")?.remove();
