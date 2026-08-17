@@ -1182,22 +1182,12 @@
     const btn = createSearchBtn();
     if (!btn) return;
 
-    // 找搜索栏（兼容两种布局）
-    const searchBar = document.querySelector(".wendian-wrapper.search-input.large, .wendian-wrapper.search-input, .search-input");
-    if (!searchBar) return;
-
-    // 找搜索栏的直接父容器
-    const container = searchBar.parentElement;
-    if (!container) return;
-
-    // 创建一个flex容器包裹搜索栏和按钮
-    const wrapper = document.createElement("div");
-    wrapper.style.cssText = "display:flex;align-items:center;gap:10px;width:100%;";
-
-    // 把搜索栏移到wrapper里
-    container.insertBefore(wrapper, searchBar);
-    wrapper.appendChild(searchBar);
-    wrapper.appendChild(btn);
+    // 固定定位到页面右上角
+    btn.style.position = "fixed";
+    btn.style.top = "12px";
+    btn.style.right = "20px";
+    btn.style.zIndex = "999999";
+    document.body.appendChild(btn);
   }
 
   // 页面滚动时重新检测并注入
