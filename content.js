@@ -698,6 +698,8 @@
   function onUrlChange() {
     if (location.href === lastUrl) return;
     lastUrl = location.href;
+    // 清理搜索页按钮
+    document.getElementById("xhs-search-extract-btn")?.remove();
     // 清理笔记详情页按钮
     document.getElementById(BUTTON_ID)?.parentElement?.remove();
     document.getElementById(DL_BTN_ID)?.parentElement?.remove();
@@ -1341,21 +1343,18 @@
     }
   }
 
-  // 创建搜索按钮并监控存活
-  function keepSearchBtnAlive() {
-    if (!location.pathname.includes("search_result")) return;
-    if (!document.getElementById("xhs-search-extract-btn")) {
-      injectSearchExtractBtn();
+  // 搜索页按钮管理
+  function manageSearchBtn() {
+    if (location.pathname.includes("search_result")) {
+      if (!document.getElementById("xhs-search-extract-btn")) injectSearchExtractBtn();
+    } else {
+      document.getElementById("xhs-search-extract-btn")?.remove();
     }
   }
   // 页面加载后创建
-  setTimeout(keepSearchBtnAlive, 2000);
-  // 监控按钮被删除后重建
-  new MutationObserver(() => {
-    if (location.pathname === "/" && !document.getElementById("xhs-search-extract-btn")) {
-      injectSearchExtractBtn();
-    }
-  }).observe(document.body, { childList: true });
+  setTimeout(manageSearchBtn, 1500);
+  // 监控DOM变化，自动创建/移除
+  new MutationObserver(manageSearchBtn).observe(document.body, { childList: true, subtree: true });
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
