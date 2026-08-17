@@ -1341,24 +1341,21 @@
     }
   }
 
-  // 只创建一次搜索按钮
-  let searchBtnCreated = false;
-  function ensureSearchBtn() {
-    if (searchBtnCreated && document.getElementById("xhs-search-extract-btn")) return;
-    if (location.pathname !== "/") {
-      document.getElementById("xhs-search-extract-btn")?.remove();
-      searchBtnCreated = false;
-      return;
-    }
+  // 创建搜索按钮并监控存活
+  function keepSearchBtnAlive() {
+    if (location.pathname !== "/") return;
     if (!document.getElementById("xhs-search-extract-btn")) {
       injectSearchExtractBtn();
-      searchBtnCreated = !!document.getElementById("xhs-search-extract-btn");
     }
   }
-  ensureSearchBtn();
-  setTimeout(ensureSearchBtn, 1000);
-  setTimeout(ensureSearchBtn, 2000);
-  setTimeout(ensureSearchBtn, 3000);
+  // 页面加载后创建
+  setTimeout(keepSearchBtnAlive, 2000);
+  // 监控按钮被删除后重建
+  new MutationObserver(() => {
+    if (location.pathname === "/" && !document.getElementById("xhs-search-extract-btn")) {
+      injectSearchExtractBtn();
+    }
+  }).observe(document.body, { childList: true });
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
