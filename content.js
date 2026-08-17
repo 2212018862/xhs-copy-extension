@@ -1344,12 +1344,23 @@
     }
   }
 
-  // 注入搜索提取按钮（简化版，用setInterval检查）
+  // 注入搜索提取按钮 + 持续校正位置
   setInterval(() => {
-    if (!document.getElementById("xhs-search-extract-btn")) {
+    const btn = document.getElementById("xhs-search-extract-btn");
+    if (!btn) {
       tryInjectSearchBtn();
+      return;
     }
-  }, 2000);
+    // 重新校正位置（搜索栏可能延迟渲染）
+    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
+    if (searchBar) {
+      const rect = searchBar.getBoundingClientRect();
+      if (rect.width > 0) {
+        btn.style.top = (rect.top + rect.height / 2 - 16) + "px";
+        btn.style.left = (rect.right + 12) + "px";
+      }
+    }
+  }, 1500);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
