@@ -1351,7 +1351,7 @@
   let searchPollCount = 0;
   const searchPoll = setInterval(() => {
     searchPollCount++;
-    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) {
+    if (location.pathname !== "/") {
       document.getElementById("xhs-search-extract-btn")?.remove();
       return;
     }
