@@ -1190,13 +1190,7 @@
     document.body.appendChild(btn);
   }
 
-  // 页面滚动时重新检测并注入
-  window.addEventListener("scroll", () => {
-    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) return;
-    if (!document.getElementById("xhs-search-extract-btn")) {
-      setTimeout(injectSearchExtractBtn, 100);
-    }
-  }, { passive: true });
+
 
   function toggleSearchPanel() {
     let panel = document.getElementById("xhs-search-panel");
