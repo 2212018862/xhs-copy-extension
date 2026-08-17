@@ -1345,22 +1345,34 @@
   }
 
   // 注入搜索提取按钮 + 持续校正位置
+  let searchBtnReady = false;
   setInterval(() => {
-    const btn = document.getElementById("xhs-search-extract-btn");
-    if (!btn) {
-      tryInjectSearchBtn();
+    if (!/\/$|\/search_result|\/explore/.test(location.pathname)) {
+      document.getElementById("xhs-search-extract-btn")?.remove();
       return;
     }
-    // 重新校正位置（搜索栏可能延迟渲染）
+    const btn = document.getElementById("xhs-search-extract-btn");
     const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
-    if (searchBar) {
-      const rect = searchBar.getBoundingClientRect();
-      if (rect.width > 0) {
-        btn.style.top = (rect.top + rect.height / 2 - 16) + "px";
-        btn.style.left = (rect.right + 12) + "px";
+    if (!searchBar) { document.getElementById("xhs-search-extract-btn")?.remove(); return; }
+
+    const rect = searchBar.getBoundingClientRect();
+    if (rect.width < 10) return; // 搜索栏还没渲染完
+
+    if (!btn) {
+      const newBtn = createSearchBtn();
+      if (newBtn) {
+        newBtn.style.position = "fixed";
+        newBtn.style.zIndex = "999999";
+        document.body.appendChild(newBtn);
+        newBtn.style.top = (rect.top + rect.height / 2 - 16) + "px";
+        newBtn.style.left = (rect.right + 12) + "px";
       }
+      return;
     }
-  }, 1500);
+    // 持续校正位置
+    btn.style.top = (rect.top + rect.height / 2 - 16) + "px";
+    btn.style.left = (rect.right + 12) + "px";
+  }, 1000);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
