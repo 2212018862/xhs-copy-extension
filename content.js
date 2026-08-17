@@ -1183,7 +1183,7 @@
     if (!btn) return;
 
     // 找搜索栏（兼容两种布局）
-    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input, [class*=\"search-input\"]");
+    const searchBar = document.querySelector(".wendian-wrapper.search-input.large, .wendian-wrapper.search-input, .search-input");
     if (!searchBar) return;
 
     // 找搜索栏的直接父容器
