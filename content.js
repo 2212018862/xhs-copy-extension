@@ -1186,13 +1186,18 @@
     const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
     if (!searchBar) return;
 
-    // 直接用 fixed 定位放到搜索栏右边，不依赖父容器
-    const searchRect = searchBar.getBoundingClientRect();
-    btn.style.position = "fixed";
-    btn.style.top = (searchRect.top + searchRect.height / 2 - 16) + "px";
-    btn.style.left = (searchRect.right + 12) + "px";
-    btn.style.zIndex = "999999";
-    document.body.appendChild(btn);
+    // 找搜索栏的直接父容器（input-box）
+    const container = searchBar.parentElement;
+    if (!container) return;
+
+    // 创建一个flex容器包裹搜索栏和按钮
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "display:flex;align-items:center;gap:10px;width:100%;";
+
+    // 把搜索栏移到wrapper里
+    container.insertBefore(wrapper, searchBar);
+    wrapper.appendChild(searchBar);
+    wrapper.appendChild(btn);
   }
 
   function toggleSearchPanel() {
@@ -1344,35 +1349,16 @@
     }
   }
 
-  // 注入搜索提取按钮 + 持续校正位置
-  let searchBtnReady = false;
+  // 注入搜索提取按钮
   setInterval(() => {
     if (!/\/$|\/search_result|\/explore/.test(location.pathname)) {
       document.getElementById("xhs-search-extract-btn")?.remove();
       return;
     }
-    const btn = document.getElementById("xhs-search-extract-btn");
-    const searchBar = document.querySelector(".wendian-wrapper.search-input, .search-input");
-    if (!searchBar) { document.getElementById("xhs-search-extract-btn")?.remove(); return; }
-
-    const rect = searchBar.getBoundingClientRect();
-    if (rect.width < 10) return; // 搜索栏还没渲染完
-
-    if (!btn) {
-      const newBtn = createSearchBtn();
-      if (newBtn) {
-        newBtn.style.position = "fixed";
-        newBtn.style.zIndex = "999999";
-        document.body.appendChild(newBtn);
-        newBtn.style.top = (rect.top + rect.height / 2 - 16) + "px";
-        newBtn.style.left = (rect.right + 12) + "px";
-      }
-      return;
+    if (!document.getElementById("xhs-search-extract-btn")) {
+      injectSearchExtractBtn();
     }
-    // 持续校正位置
-    btn.style.top = (rect.top + rect.height / 2 - 16) + "px";
-    btn.style.left = (rect.right + 12) + "px";
-  }, 1000);
+  }, 2000);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
