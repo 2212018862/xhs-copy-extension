@@ -1363,77 +1363,12 @@
     }
   }
 
-  // 搜索页自动应用筛选条件
-  let filterApplied = false;
-  let filterTimer2 = null;
-  function tryApplySearchFilters() {
-    if (filterTimer2) return;
-    if (!/\/search_result/.test(location.pathname)) { filterApplied = false; return; }
-    filterTimer2 = setTimeout(() => { filterTimer2 = null; }, 3000);
-
-    chrome.storage.local.get("xhs_search_filters", (result) => {
-      const filters = result.xhs_search_filters;
-      if (!filters || Object.values(filters).every(v => !v)) return;
-
-      // 找筛选按钮并点击
-      const filterBtn = document.querySelector('[class*="filter-btn"], [class*="筛选"]');
-      // 找包含"筛选"文字的元素
-      const allEls = document.querySelectorAll('span, div, button');
-      let btn = null;
-      for (const el of allEls) {
-        if (el.textContent?.trim() === "筛选" && el.offsetParent !== null) {
-          btn = el;
-          break;
-        }
-      }
-      if (!btn) return;
-
-      btn.click();
-      filterApplied = true;
-
-      // 等面板弹出后点击对应选项
-      setTimeout(() => {
-        const panel = document.querySelector('[class*="filter-panel"], [class*="filter-container"], [class*="popover"]') || document.body;
-
-        // 映射：我们的filter key → 面板里的文字
-        const filterMap = {
-          sort: { time_descending: "最新", popularity_descending: "最多点赞", comment: "最多评论", collect: "最多收藏" },
-          noteType: { video: "视频", normal: "图文" },
-          timeRange: { "1": "一天内", "2": "一周内", "3": "半年内" },
-          scope: { viewed: "已看过", unviewed: "未看过", followed: "已关注" },
-          location: { same_city: "同城", nearby: "附近" },
-        };
-
-        for (const [key, value] of Object.entries(filters)) {
-          if (!value || !filterMap[key]?.[value]) continue;
-          const targetText = filterMap[key][value];
-          // 找面板里文字匹配的按钮
-          const items = panel.querySelectorAll('[class*="item"], [class*="tag"], [class*="btn"], [class*="option"], span, div');
-          for (const item of items) {
-            if (item.textContent?.trim() === targetText && item.offsetParent !== null) {
-              item.click();
-              break;
-            }
-          }
-        }
-
-        // 清除storage
-        chrome.storage.local.remove("xhs_search_filters");
-
-        // 点击收起/确认
-        setTimeout(() => {
-          const collapseBtn = Array.from(document.querySelectorAll('span, div, button')).find(el => el.textContent?.trim() === "收起" || el.textContent?.trim() === "确认");
-          if (collapseBtn) collapseBtn.click();
-        }, 500);
-      }, 1000);
-    });
-  }
-
-  // 在 MutationObserver 里也调用
-  new MutationObserver(() => {
-    tryInjectSearchBtn();
-    if (/\/search_result/.test(location.pathname)) tryApplySearchFilters();
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  // 注入搜索提取按钮（简化版，用setInterval检查）
+  setInterval(() => {
+    if (!document.getElementById("xhs-search-extract-btn")) {
+      tryInjectSearchBtn();
+    }
+  }, 2000);
 
   setTimeout(tryInjectSearchBtn, 1500);
 })();
