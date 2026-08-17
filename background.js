@@ -121,4 +121,57 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     processQueue();
     return true;
   }
+  if (msg.action === "fetchSearchResults") {
+    // 打开搜索页，提取笔记列表
+    const searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(msg.keyword)}&source=web_search_result_notes`;
+    chrome.tabs.create({ url: searchUrl, active: false }, (tab) => {
+      const tabId = tab.id;
+      let done = false;
+      const cleanup = () => { if (!done) { done = true; chrome.tabs.remove(tabId).catch(() => {}); } };
+
+      const listener = (id, info) => {
+        if (id !== tabId || info.status !== "complete") return;
+        chrome.tabs.onUpdated.removeListener(listener);
+
+      // 轮询等页面渲染
+      let attempts = 0;
+      const tryExtract = () => {
+        attempts++;
+        chrome.scripting.executeScript({
+          target: { tabId }, world: "MAIN",
+          func: () => {
+            try {
+              const state = window.__INITIAL_STATE__;
+              const items = state?.search?.feeds || [];
+              return items.map(item => {
+                const note = item.noteCard || item;
+                return {
+                  noteId: note.noteId || item.id || "",
+                  title: note.displayTitle || note.title || "",
+                  desc: note.desc || "",
+                  author: note.user?.nickname || note.nickname || "",
+                  type: note.type || "",
+                  url: `https://www.xiaohongshu.com/explore/${note.noteId || item.id || ""}`,
+                };
+              }).filter(n => n.noteId);
+            } catch(e) { return []; }
+          }
+        }).then(r => {
+          const notes = r?.[0]?.result || [];
+          if (notes.length > 0 || attempts >= 10) {
+            cleanup();
+            resolve({ notes });
+          } else {
+            setTimeout(tryExtract, 1000);
+          }
+        }).catch(() => { cleanup(); resolve({ notes: [] }); });
+      };
+      setTimeout(tryExtract, 2000);
+      };
+
+      chrome.tabs.onUpdated.addListener(listener);
+      setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); cleanup(); resolve({ notes: [] }); }, 15000);
+    });
+    return true;
+  }
 });

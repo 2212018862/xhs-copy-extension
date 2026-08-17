@@ -1194,6 +1194,43 @@
 
 
 
+  // 调用大模型API
+  async function callLLM(apikey, baseurl, model, prompt, note) {
+    const noteText = `标题: ${note.title || ""}\n内容: ${note.desc || ""}\n作者: ${note.author || ""}`;
+    const systemPrompt = "你是一个笔记筛选助手。根据用户的要求判断笔记是否符合条件。只回复JSON：{\"match\": true/false, \"reason\": \"简短原因\"}";
+
+    const response = await fetch(`${baseurl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apikey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `筛选要求: ${prompt}\n\n笔记信息:\n${noteText}` },
+        ],
+        temperature: 0.1,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) throw new Error(`API错误: ${response.status}`);
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    // 尝试解析JSON
+    try {
+      const match = content.match(/\{[^}]+\}/);
+      if (match) return JSON.parse(match[0]);
+    } catch (_) {}
+
+    // 降级：简单文本匹配
+    const lower = content.toLowerCase();
+    return { match: lower.includes("true"), reason: content.substring(0, 100) };
+  }
+
   function toggleSearchPanel() {
     let panel = document.getElementById("xhs-search-panel");
     if (panel) { panel.remove(); return; }
@@ -1269,11 +1306,58 @@
         </div>
       </div>
 
-      <button id="xhs-search-start" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;">
+      <button id="xhs-search-start" style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;margin-bottom:16px;">
         开始搜索
       </button>
+
+      <div style="border-top:1px solid #333;padding-top:16px;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">🤖 大模型配置</div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">API Key</label>
+          <input id="xhs-llm-apikey" type="password" placeholder="sk-..."
+            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">Base URL</label>
+          <input id="xhs-llm-baseurl" type="text" placeholder="https://api.openai.com/v1"
+            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">模型</label>
+          <input id="xhs-llm-model" type="text" placeholder="gpt-4o-mini"
+            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #333;padding-top:16px;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:12px;">🎯 智能提取</div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">提示词（告诉大模型你要什么样的笔记）</label>
+          <textarea id="xhs-llm-prompt" placeholder="例如：只要笔记内容大于50字的笔记" rows="3"
+            style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;resize:vertical;" />
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;">
+            <label style="display:block;margin-bottom:4px;font-size:12px;color:#aaa;">提取数量</label>
+            <input id="xhs-llm-count" type="number" value="3" min="1" max="50"
+              style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #333;background:#16213e;color:#fff;font-size:13px;box-sizing:border-box;outline:none;" />
+          </div>
+        </div>
+        <button id="xhs-search-extract" style="width:100%;padding:12px;background:linear-gradient(135deg,#e74c3c,#c0392b);color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;">
+          🔍 搜索并提取
+        </button>
+        <div id="xhs-extract-status" style="margin-top:8px;font-size:12px;color:#aaa;text-align:center;"></div>
+      </div>
     `;
     document.body.appendChild(panel);
+
+    // 加载保存的LLM配置
+    chrome.storage.local.get("xhs_llm_config", (result) => {
+      const cfg = result.xhs_llm_config || {};
+      if (cfg.apikey) panel.querySelector("#xhs-llm-apikey").value = cfg.apikey;
+      if (cfg.baseurl) panel.querySelector("#xhs-llm-baseurl").value = cfg.baseurl;
+      if (cfg.model) panel.querySelector("#xhs-llm-model").value = cfg.model;
+    });
 
     // 注入筛选样式
     if (!document.getElementById("xhs-search-panel-css")) {
@@ -1323,6 +1407,119 @@
       const url = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}&source=web_search_result_notes`;
       window.location.href = url;
       panel.remove();
+    });
+
+    // 搜索并提取按钮
+    panel.querySelector("#xhs-search-extract").addEventListener("click", async () => {
+      const keyword = panel.querySelector("#xhs-search-keyword").value.trim();
+      if (!keyword) { showToast("请输入搜索关键词", false); return; }
+
+      const apikey = panel.querySelector("#xhs-llm-apikey").value.trim();
+      const baseurl = panel.querySelector("#xhs-llm-baseurl").value.trim().replace(/\/$/, "");
+      const model = panel.querySelector("#xhs-llm-model").value.trim();
+      const prompt = panel.querySelector("#xhs-llm-prompt").value.trim();
+      const count = parseInt(panel.querySelector("#xhs-llm-count").value) || 3;
+
+      if (!apikey || !baseurl || !model) { showToast("请先配置大模型信息", false); return; }
+      if (!prompt) { showToast("请输入提示词", false); return; }
+
+      // 保存LLM配置
+      chrome.storage.local.set({ xhs_llm_config: { apikey, baseurl, model } });
+
+      const statusEl = panel.querySelector("#xhs-extract-status");
+      const extractBtn = panel.querySelector("#xhs-search-extract");
+      extractBtn.disabled = true;
+      extractBtn.textContent = "⏳ 搜索中...";
+      statusEl.textContent = "正在搜索笔记...";
+
+      try {
+        // 1. 获取筛选条件
+        const filters = {};
+        panel.querySelectorAll(".xhs-filter-row").forEach(row => {
+          const filterName = row.dataset.filter;
+          const activeItem = row.querySelector(".xhs-filter-item.active");
+          filters[filterName] = activeItem?.dataset.value || "";
+        });
+
+        // 2. 用background fetch搜索页面
+        const searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}&source=web_search_result_notes`;
+        const searchResponse = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ action: "fetchNote", url: searchUrl }, resp => {
+            if (chrome.runtime.lastError) { resolve({ data: null }); return; }
+            resolve(resp);
+          });
+        });
+
+        // 3. 解析搜索结果页面中的笔记链接
+        // 打开搜索页获取笔记列表
+        const tabResponse = await new Promise(resolve => {
+          chrome.runtime.sendMessage({ action: "fetchSearchResults", keyword, filters }, resolve);
+        });
+
+        const notes = tabResponse?.notes || [];
+        if (notes.length === 0) {
+          statusEl.textContent = "未找到搜索结果";
+          extractBtn.disabled = false;
+          extractBtn.textContent = "🔍 搜索并提取";
+          return;
+        }
+
+        statusEl.textContent = `找到 ${notes.length} 条笔记，正在用大模型筛选...`;
+        extractBtn.textContent = "🤖 AI筛选中...";
+
+        // 4. 逐条发送给大模型判断
+        let extracted = 0;
+        const results = [];
+
+        for (let i = 0; i < notes.length && extracted < count; i++) {
+          const note = notes[i];
+          statusEl.textContent = `🤖 正在判断第 ${i+1}/${notes.length} 条（已匹配 ${extracted}/${count}）`;
+
+          try {
+            const aiResult = await callLLM(apikey, baseurl, model, prompt, note);
+            if (aiResult.match) {
+              results.push(note);
+              extracted++;
+              statusEl.textContent = `✅ 第 ${i+1} 条匹配！（${extracted}/${count}） ${note.title || "无标题"}`;
+            } else {
+              statusEl.textContent = `❌ 第 ${i+1} 条不匹配：${aiResult.reason || "不符合条件"}`;
+            }
+          } catch (err) {
+            statusEl.textContent = `⚠️ 第 ${i+1} 条判断失败：${err.message}`;
+          }
+
+          // 短暂延迟避免请求过快
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        // 5. 把匹配的笔记加入待提取队列
+        for (const note of results) {
+          if (!noteQueue.find(n => n.url?.includes(note.noteId))) {
+            noteQueue.push({
+              title: note.title || "无标题",
+              desc: note.desc || "",
+              author: note.author || "",
+              url: note.url || `https://www.xiaohongshu.com/explore/${note.noteId}`,
+              tags: [],
+              images: [],
+              videoUrl: "",
+              noteType: note.type || "",
+              comments: [],
+            });
+          }
+        }
+        updateQueuePanel();
+
+        statusEl.textContent = `🎉 完成！已将 ${results.length} 篇笔记加入待提取`;
+        extractBtn.disabled = false;
+        extractBtn.textContent = "🔍 搜索并提取";
+
+      } catch (err) {
+        console.error("[XHS-Copy] 搜索提取失败:", err);
+        statusEl.textContent = `❌ 失败：${err.message}`;
+        extractBtn.disabled = false;
+        extractBtn.textContent = "🔍 搜索并提取";
+      }
     });
 
     // 点击面板外部关闭
