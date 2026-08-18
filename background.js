@@ -187,14 +187,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                   }));
                 }
               }
-              const links = document.querySelectorAll('a[href*="/explore/"]');
+              const links = document.querySelectorAll('a[href*="/search_result/"], a[href*="/explore/"]');
               const seen = new Set();
               return Array.from(links).map(a => {
                 const href = a.getAttribute("href") || "";
-                const m = href.match(/\/explore\/([^/?#]+)/);
+                const m = href.match(/\/(?:search_result|explore)\/([^/?#]+)/);
                 if (!m || seen.has(m[1])) return null;
                 seen.add(m[1]);
-                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: `https://www.xiaohongshu.com${href}` };
+                const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: fullUrl };
               }).filter(Boolean);
             } catch(e) { return []; }
           }
