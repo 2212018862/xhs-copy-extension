@@ -1707,59 +1707,49 @@
         updateStatus(`📖 提取第 ${i+1}/${noteLinks.length} 条（已匹配 ${extracted}/${count}）`);
 
         try {
-          // 在页面内点击链接打开笔记（保留token和referer）
+          // 跳转到笔记详情页提取数据
           const noteDetail = await new Promise((resolve) => {
-            // 找到对应的链接元素并模拟点击
-            const linkEl = document.querySelector(`a[href*="${link.noteId}"]`);
-            if (!linkEl) { resolve(null); return; }
-            
-            // 点击打开笔记详情
-            linkEl.click();
-            
+            window.location.href = link.url;
             // 等待页面加载后提取数据
             let attempts = 0;
             const checkInterval = setInterval(() => {
               attempts++;
-              const state = window.__INITIAL_STATE__;
-              const map = state?.note?.noteDetailMap || {};
-              const noteId = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1];
-              
-              if (noteId && map[noteId]) {
-                clearInterval(checkInterval);
-                const d = map[noteId];
-                const n = d?.note && typeof d.note === "object" ? d.note : d;
-                if (n && (!d?.note?.noteId || d.note.noteId === noteId)) {
-                  const imgs = (n.imageList||[]).map(img => {
-                    const u = img?.urlDefault || img?.urlPre || img?.url || "";
-                    return u.startsWith("//") ? "https:" + u : u;
-                  }).filter(Boolean);
-                  let vid = "";
-                  const s = n?.video?.media?.stream;
-                  if (s) { for (const k of Object.keys(s)) { const arr = s[k]; if (Array.isArray(arr) && arr.length > 0 && arr[0].masterUrl) { vid = arr[0].masterUrl; break; } } }
-                  const c = [];
-                  const cm = state?.comment?.commentMap || {};
-                  for (const v of Object.values(cm)) { if (v.content) c.push({ user: v.userInfo?.nickname || "", content: v.content, likes: v.likeCount || 0 }); }
-                  resolve({ title: n?.title || "", desc: n?.desc || "", author: n?.user?.nickname || "", tags: (n?.tagList||[]).map(t=>t?.name).filter(Boolean), images: imgs, videoUrl: vid, noteType: (n?.type||"").toLowerCase(), comments: c, url: location.href });
-                } else {
+              try {
+                const state = window.__INITIAL_STATE__;
+                const map = state?.note?.noteDetailMap || {};
+                const noteId = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1];
+                
+                if (noteId && map[noteId]) {
                   clearInterval(checkInterval);
-                  resolve(null);
-                }
-              } else if (attempts >= 10) {
-                clearInterval(checkInterval);
-                resolve(null);
-              }
+                  const d = map[noteId];
+                  const n = d?.note && typeof d.note === "object" ? d.note : d;
+                  if (n && (!d?.note?.noteId || d.note.noteId === noteId)) {
+                    const imgs = (n.imageList||[]).map(img => {
+                      const u = img?.urlDefault || img?.urlPre || img?.url || "";
+                      return u.startsWith("//") ? "https:" + u : u;
+                    }).filter(Boolean);
+                    let vid = "";
+                    const s = n?.video?.media?.stream;
+                    if (s) { for (const k of Object.keys(s)) { const arr = s[k]; if (Array.isArray(arr) && arr.length > 0 && arr[0].masterUrl) { vid = arr[0].masterUrl; break; } } }
+                    const c = [];
+                    const cm = state?.comment?.commentMap || {};
+                    for (const v of Object.values(cm)) { if (v.content) c.push({ user: v.userInfo?.nickname || "", content: v.content, likes: v.likeCount || 0 }); }
+                    resolve({ title: n?.title || "", desc: n?.desc || "", author: n?.user?.nickname || "", tags: (n?.tagList||[]).map(t=>t?.name).filter(Boolean), images: imgs, videoUrl: vid, noteType: (n?.type||"").toLowerCase(), comments: c, url: location.href });
+                  } else { clearInterval(checkInterval); resolve(null); }
+                } else if (attempts >= 15) { clearInterval(checkInterval); resolve(null); }
+              } catch(_) {}
             }, 1000);
           });
 
           if (!noteDetail || (!noteDetail.title && !noteDetail.desc)) {
             updateStatus(`⚠️ 第 ${i+1} 条提取失败，跳过`);
             // 返回搜索结果页
-            history.back();
+            window.history.go(-1);
             await new Promise(r => setTimeout(r, 2000));
             continue;
           }
 
-          if (smartExtractStopped) { history.back(); break; }
+          if (smartExtractStopped) { window.history.go(-1); break; }
 
           updateStatus(`🤖 AI判断第 ${i+1} 条：${noteDetail.title?.substring(0, 20) || "无标题"}...`);
           const aiResult = await callLLM(apikey, baseurl, model, prompt, noteDetail);
@@ -1775,12 +1765,12 @@
           }
 
           // 返回搜索结果页
-          history.back();
+          window.history.go(-1);
           await new Promise(r => setTimeout(r, 2000));
 
         } catch (err) {
           updateStatus(`⚠️ 第 ${i+1} 条失败：${err.message}`);
-          history.back();
+          window.history.go(-1);
           await new Promise(r => setTimeout(r, 1000));
         }
 
