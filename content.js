@@ -1686,9 +1686,123 @@
     });
   }
 
+  // ══════════════════════════════════════════
+  //  搜索结果页：智能提取（LLM逐条判断）
+  // ══════════════════════════════════════════
+  let smartExtractStopped = false;
+  function trySmartExtract() {
+    if (!location.pathname.includes("search_result")) return;
+
+    chrome.storage.local.get("xhs_smart_extract", async (result) => {
+      const cfg = result.xhs_smart_extract;
+      if (!cfg || !cfg.keyword) return;
+      // 只执行一次
+      chrome.storage.local.remove("xhs_smart_extract");
+
+      const { keyword, apikey, baseurl, model, prompt, count } = cfg;
+      smartExtractStopped = false;
+
+      // 创建悬浮状态面板+停止按钮
+      const statusBar = document.createElement("div");
+      statusBar.id = "xhs-smart-extract-bar";
+      statusBar.style.cssText = `
+        position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:9999999;
+        background:#1a1a2e; border-radius:12px; padding:12px 20px; box-shadow:0 8px 32px rgba(0,0,0,0.4);
+        display:flex; align-items:center; gap:12px; max-width:90vw;
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+        color:#fff; font-size:13px;
+      `;
+      statusBar.innerHTML = `
+        <div id="xhs-smart-status" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📖 等待搜索结果加载...</div>
+        <div id="xhs-smart-stop" style="padding:6px 14px;background:#e74c3c;color:#fff;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;">⏹ 停止</div>
+      `;
+      document.body.appendChild(statusBar);
+      statusBar.querySelector("#xhs-smart-stop").addEventListener("click", () => {
+        smartExtractStopped = true;
+        statusBar.querySelector("#xhs-smart-status").textContent = "⏹ 已停止";
+        setTimeout(() => statusBar.remove(), 2000);
+      });
+
+      const updateStatus = (text) => {
+        const el = statusBar.querySelector("#xhs-smart-status");
+        if (el) el.textContent = text;
+      };
+
+      // 等页面渲染完
+      await new Promise(r => setTimeout(r, 4000));
+      if (smartExtractStopped) { statusBar.remove(); return; }
+
+      // 提取笔记链接
+      const links = document.querySelectorAll('a[href*="/explore/"]');
+      const seen = new Set();
+      const noteLinks = [];
+      links.forEach(a => {
+        const m = a.getAttribute("href")?.match(/\/explore\/([^/?#]+)/);
+        if (m && !seen.has(m[1])) {
+          seen.add(m[1]);
+          noteLinks.push({ noteId: m[1], url: `https://www.xiaohongshu.com/explore/${m[1]}` });
+        }
+      });
+
+      if (noteLinks.length === 0) {
+        updateStatus("❌ 未找到笔记链接");
+        setTimeout(() => statusBar.remove(), 3000);
+        return;
+      }
+
+      updateStatus(`📖 找到 ${noteLinks.length} 条笔记，开始逐条提取...`);
+      let extracted = 0;
+
+      for (let i = 0; i < noteLinks.length && extracted < count && !smartExtractStopped; i++) {
+        const link = noteLinks[i];
+        updateStatus(`📖 提取第 ${i+1}/${noteLinks.length} 条（已匹配 ${extracted}/${count}）`);
+
+        try {
+          const detailResponse = await new Promise(resolve => {
+            chrome.runtime.sendMessage({ action: "extractNote", url: link.url }, resolve);
+          });
+
+          const noteData = detailResponse?.data;
+          if (!noteData || (!noteData.title && !noteData.desc)) {
+            updateStatus(`⚠️ 第 ${i+1} 条提取失败，跳过`);
+            await new Promise(r => setTimeout(r, 300));
+            continue;
+          }
+
+          if (smartExtractStopped) break;
+
+          updateStatus(`🤖 AI判断第 ${i+1} 条：${noteData.title?.substring(0, 20) || "无标题"}...`);
+          const aiResult = await callLLM(apikey, baseurl, model, prompt, noteData);
+
+          if (aiResult.match) {
+            if (!noteQueue.find(n => n.url?.includes(noteData.url))) {
+              noteQueue.push(noteData);
+            }
+            extracted++;
+            updateStatus(`✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${noteData.title?.substring(0, 30) || "无标题"}`);
+          } else {
+            updateStatus(`❌ 第 ${i+1} 条不匹配：${aiResult.reason?.substring(0, 50) || ""}`);
+          }
+        } catch (err) {
+          updateStatus(`⚠️ 第 ${i+1} 条失败：${err.message}`);
+        }
+
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      updateStatus(`🎉 完成！已将 ${extracted} 篇笔记加入待提取`);
+      updateQueuePanel();
+      setTimeout(() => statusBar.remove(), 5000);
+    });
+  }
+
   // 搜索结果页监听
   new MutationObserver(() => {
-    if (location.pathname.includes("search_result")) tryApplySearchFilters();
+    if (location.pathname.includes("search_result")) {
+      tryApplySearchFilters();
+      trySmartExtract();
+    }
   }).observe(document.documentElement, { childList: true, subtree: true });
   setTimeout(tryApplySearchFilters, 3000);
+  setTimeout(trySmartExtract, 4000);
 })();
