@@ -121,6 +121,41 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     processQueue();
     return true;
   }
+  if (msg.action === "getSearchNoteLinks") {
+    // 在当前页面用 MAIN 世界提取带 token 的链接
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs?.[0]?.id) { sendResponse({ notes: [] }); return; }
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id }, world: "MAIN",
+        func: () => {
+          try {
+            const state = window.__INITIAL_STATE__;
+            const feeds = state?.search?.feeds;
+            if (!feeds) return [];
+            const raw = feeds._rawValue || feeds;
+            const notes = [];
+            const seen = new Set();
+            Object.values(raw).forEach(item => {
+              const r = item?._rawValue || item;
+              const nc = r?.noteCard?._rawValue || r?.noteCard;
+              const noteId = nc?.noteId || r?.id;
+              const token = r?.xsecToken || "";
+              if (noteId && !seen.has(noteId)) {
+                seen.add(noteId);
+                notes.push({
+                  noteId,
+                  url: `https://www.xiaohongshu.com/explore/${noteId}?xsec_token=${token}&xsec_source=pc_search`,
+                });
+              }
+            });
+            return notes;
+          } catch(e) { return []; }
+        }
+      }).then(r => sendResponse({ notes: r?.[0]?.result || [] }))
+        .catch(() => sendResponse({ notes: [] }));
+    });
+    return true;
+  }
   if (msg.action === "fetchSearchResults") {
     const searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(msg.keyword)}&source=web_search_result_notes`;
     chrome.tabs.create({ url: searchUrl, active: false }, (tab) => {
