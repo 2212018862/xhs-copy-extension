@@ -162,14 +162,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const notes = r?.[0]?.result || [];
           if (notes.length > 0 || attempts >= 15) {
             cleanup();
-            resolve({ notes });
+            sendResponse({ notes });
           } else {
             setTimeout(tryExtract, 1500);
           }
-        }).catch(() => { cleanup(); resolve({ notes: [] }); });
+        }).catch(() => { cleanup(); sendResponse({ notes: [] }); });
       };
       setTimeout(tryExtract, 3000);
-      setTimeout(() => { cleanup(); resolve({ notes: [] }); }, 30000);
+      setTimeout(() => { cleanup(); sendResponse({ notes: [] }); }, 30000);
     });
     return true;
   }
