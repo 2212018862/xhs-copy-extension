@@ -1707,33 +1707,81 @@
         updateStatus(`📖 提取第 ${i+1}/${noteLinks.length} 条（已匹配 ${extracted}/${count}）`);
 
         try {
-          const detailResponse = await new Promise(resolve => {
-            chrome.runtime.sendMessage({ action: "extractNote", url: link.url }, resolve);
+          // 在页面内点击链接打开笔记（保留token和referer）
+          const noteDetail = await new Promise((resolve) => {
+            // 找到对应的链接元素并模拟点击
+            const linkEl = document.querySelector(`a[href*="${link.noteId}"]`);
+            if (!linkEl) { resolve(null); return; }
+            
+            // 点击打开笔记详情
+            linkEl.click();
+            
+            // 等待页面加载后提取数据
+            let attempts = 0;
+            const checkInterval = setInterval(() => {
+              attempts++;
+              const state = window.__INITIAL_STATE__;
+              const map = state?.note?.noteDetailMap || {};
+              const noteId = location.pathname.match(/\/explore\/([^/?#]+)/)?.[1];
+              
+              if (noteId && map[noteId]) {
+                clearInterval(checkInterval);
+                const d = map[noteId];
+                const n = d?.note && typeof d.note === "object" ? d.note : d;
+                if (n && (!d?.note?.noteId || d.note.noteId === noteId)) {
+                  const imgs = (n.imageList||[]).map(img => {
+                    const u = img?.urlDefault || img?.urlPre || img?.url || "";
+                    return u.startsWith("//") ? "https:" + u : u;
+                  }).filter(Boolean);
+                  let vid = "";
+                  const s = n?.video?.media?.stream;
+                  if (s) { for (const k of Object.keys(s)) { const arr = s[k]; if (Array.isArray(arr) && arr.length > 0 && arr[0].masterUrl) { vid = arr[0].masterUrl; break; } } }
+                  const c = [];
+                  const cm = state?.comment?.commentMap || {};
+                  for (const v of Object.values(cm)) { if (v.content) c.push({ user: v.userInfo?.nickname || "", content: v.content, likes: v.likeCount || 0 }); }
+                  resolve({ title: n?.title || "", desc: n?.desc || "", author: n?.user?.nickname || "", tags: (n?.tagList||[]).map(t=>t?.name).filter(Boolean), images: imgs, videoUrl: vid, noteType: (n?.type||"").toLowerCase(), comments: c, url: location.href });
+                } else {
+                  clearInterval(checkInterval);
+                  resolve(null);
+                }
+              } else if (attempts >= 10) {
+                clearInterval(checkInterval);
+                resolve(null);
+              }
+            }, 1000);
           });
 
-          const noteData = detailResponse?.data;
-          if (!noteData || (!noteData.title && !noteData.desc)) {
+          if (!noteDetail || (!noteDetail.title && !noteDetail.desc)) {
             updateStatus(`⚠️ 第 ${i+1} 条提取失败，跳过`);
-            await new Promise(r => setTimeout(r, 300));
+            // 返回搜索结果页
+            history.back();
+            await new Promise(r => setTimeout(r, 2000));
             continue;
           }
 
-          if (smartExtractStopped) break;
+          if (smartExtractStopped) { history.back(); break; }
 
-          updateStatus(`🤖 AI判断第 ${i+1} 条：${noteData.title?.substring(0, 20) || "无标题"}...`);
-          const aiResult = await callLLM(apikey, baseurl, model, prompt, noteData);
+          updateStatus(`🤖 AI判断第 ${i+1} 条：${noteDetail.title?.substring(0, 20) || "无标题"}...`);
+          const aiResult = await callLLM(apikey, baseurl, model, prompt, noteDetail);
 
           if (aiResult.match) {
-            if (!noteQueue.find(n => n.url?.includes(noteData.url))) {
-              noteQueue.push(noteData);
+            if (!noteQueue.find(n => n.url?.includes(noteDetail.url))) {
+              noteQueue.push(noteDetail);
             }
             extracted++;
-            updateStatus(`✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${noteData.title?.substring(0, 30) || "无标题"}`);
+            updateStatus(`✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${noteDetail.title?.substring(0, 30) || "无标题"}`);
           } else {
             updateStatus(`❌ 第 ${i+1} 条不匹配：${aiResult.reason?.substring(0, 50) || ""}`);
           }
+
+          // 返回搜索结果页
+          history.back();
+          await new Promise(r => setTimeout(r, 2000));
+
         } catch (err) {
           updateStatus(`⚠️ 第 ${i+1} 条失败：${err.message}`);
+          history.back();
+          await new Promise(r => setTimeout(r, 1000));
         }
 
         await new Promise(r => setTimeout(r, 500));
