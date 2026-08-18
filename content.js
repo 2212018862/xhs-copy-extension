@@ -1660,10 +1660,13 @@
       const seen = new Set();
       const noteLinks = [];
       links.forEach(a => {
-        const m = a.getAttribute("href")?.match(/\/explore\/([^/?#]+)/);
+        const href = a.getAttribute("href") || "";
+        const m = href.match(/\/explore\/([^/?#]+)/);
         if (m && !seen.has(m[1])) {
           seen.add(m[1]);
-          noteLinks.push({ noteId: m[1], url: `https://www.xiaohongshu.com/explore/${m[1]}` });
+          // 用完整href（含xsec_token），拼上域名
+          const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+          noteLinks.push({ noteId: m[1], url: fullUrl });
         }
       });
 

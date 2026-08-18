@@ -151,10 +151,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
               const links = document.querySelectorAll('a[href*="/explore/"]');
               const seen = new Set();
               return Array.from(links).map(a => {
-                const m = a.getAttribute("href")?.match(/\/explore\/([^/?#]+)/);
+                const href = a.getAttribute("href") || "";
+                const m = href.match(/\/explore\/([^/?#]+)/);
                 if (!m || seen.has(m[1])) return null;
                 seen.add(m[1]);
-                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: `https://www.xiaohongshu.com/explore/${m[1]}` };
+                const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
+                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: fullUrl };
               }).filter(Boolean);
             } catch(e) { return []; }
           }
