@@ -1656,19 +1656,42 @@
       if (smartExtractStopped) { statusBar.remove(); return; }
 
       // 提取笔记链接
-      const links = document.querySelectorAll('a[href*="/explore/"]');
+      // 优先从 __INITIAL_STATE__ 取带 token 的链接
+      let noteLinks = [];
       const seen = new Set();
-      const noteLinks = [];
-      links.forEach(a => {
-        const href = a.getAttribute("href") || "";
-        const m = href.match(/\/explore\/([^/?#]+)/);
-        if (m && !seen.has(m[1])) {
-          seen.add(m[1]);
-          // 用完整href（含xsec_token），拼上域名
-          const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
-          noteLinks.push({ noteId: m[1], url: fullUrl });
+      try {
+        const state = window.__INITIAL_STATE__;
+        const feeds = state?.search?.feeds;
+        if (feeds) {
+          const raw = feeds._rawValue || feeds;
+          Object.values(raw).forEach(item => {
+            const r = item?._rawValue || item;
+            const nc = r?.noteCard?._rawValue || r?.noteCard;
+            const noteId = nc?.noteId || r?.id;
+            const token = r?.xsecToken || "";
+            if (noteId && !seen.has(noteId)) {
+              seen.add(noteId);
+              noteLinks.push({
+                noteId,
+                url: `https://www.xiaohongshu.com/explore/${noteId}?xsec_token=${token}&xsec_source=pc_search`,
+              });
+            }
+          });
         }
-      });
+      } catch(_) {}
+      
+      // 降级：从 DOM 链接取（可能没有 token）
+      if (noteLinks.length === 0) {
+        const links = document.querySelectorAll('a[href*="/explore/"]');
+        links.forEach(a => {
+          const href = a.getAttribute("href") || "";
+          const m = href.match(/\/explore\/([^/?#]+)/);
+          if (m && !seen.has(m[1])) {
+            seen.add(m[1]);
+            noteLinks.push({ noteId: m[1], url: `https://www.xiaohongshu.com${href}` });
+          }
+        });
+      }
 
       if (noteLinks.length === 0) {
         updateStatus("❌ 未找到笔记链接");

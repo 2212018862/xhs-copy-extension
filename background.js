@@ -136,17 +136,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           func: () => {
             try {
               const state = window.__INITIAL_STATE__;
-              const feeds = state?.search?.feeds || state?.search?.noteList || [];
-              const items = feeds.map(f => f.noteCard || f).filter(Boolean);
-              if (items.length > 0) {
-                return items.map(note => ({
-                  noteId: note.noteId || note.id || "",
-                  title: note.displayTitle || note.title || "",
-                  desc: note.desc || "",
-                  author: note.user?.nickname || note.nickname || "",
-                  type: note.type || "",
-                  url: `https://www.xiaohongshu.com/explore/${note.noteId || note.id || ""}`,
-                })).filter(n => n.noteId);
+              const feeds = state?.search?.feeds;
+              if (feeds) {
+                const raw = feeds._rawValue || feeds;
+                const items = Object.values(raw).map(item => {
+                  const r = item?._rawValue || item;
+                  const nc = r?.noteCard?._rawValue || r?.noteCard;
+                  return { noteId: nc?.noteId || r?.id || "", xsecToken: r?.xsecToken || "" };
+                }).filter(n => n.noteId);
+                if (items.length > 0) {
+                  return items.map(n => ({
+                    noteId: n.noteId,
+                    title: "", desc: "", author: "", type: "",
+                    url: `https://www.xiaohongshu.com/explore/${n.noteId}?xsec_token=${n.xsecToken}&xsec_source=pc_search`,
+                  }));
+                }
               }
               const links = document.querySelectorAll('a[href*="/explore/"]');
               const seen = new Set();
@@ -155,8 +159,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 const m = href.match(/\/explore\/([^/?#]+)/);
                 if (!m || seen.has(m[1])) return null;
                 seen.add(m[1]);
-                const fullUrl = href.startsWith("http") ? href : `https://www.xiaohongshu.com${href}`;
-                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: fullUrl };
+                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: `https://www.xiaohongshu.com${href}` };
               }).filter(Boolean);
             } catch(e) { return []; }
           }
