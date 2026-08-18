@@ -1495,102 +1495,25 @@
       panel.remove();
     });
 
-    // 搜索并提取按钮
-    panel.querySelector("#xhs-search-extract").addEventListener("click", async () => {
+    // 搜索并提取按钮：保存设置后跳转搜索页（当前页）
+    panel.querySelector("#xhs-search-extract").addEventListener("click", () => {
       const keyword = panel.querySelector("#xhs-search-keyword").value.trim();
       if (!keyword) { showToast("请输入搜索关键词", false); return; }
-
-      const cfg = await new Promise(resolve => chrome.storage.local.get("xhs_llm_config", r => resolve(r.xhs_llm_config || {})));
-      const apikey = cfg.apikey || "";
-      const baseurl = cfg.baseurl || "";
-      const model = cfg.model || "";
       const prompt = panel.querySelector("#xhs-llm-prompt").value.trim();
       const count = parseInt(panel.querySelector("#xhs-llm-count").value) || 3;
-
-      if (!apikey || !baseurl || !model) { showToast("请先配置大模型信息", false); return; }
       if (!prompt) { showToast("请输入提示词", false); return; }
 
-      const statusEl = panel.querySelector("#xhs-extract-status");
-      const extractBtn = panel.querySelector("#xhs-search-extract");
-      extractBtn.disabled = true;
-      extractBtn.textContent = "⏳ 搜索中...";
-      statusEl.textContent = "正在搜索笔记...";
+      chrome.storage.local.get("xhs_llm_config", (r) => {
+        const cfg = r.xhs_llm_config || {};
+        if (!cfg.apikey || !cfg.baseurl || !cfg.model) { showToast("请先配置大模型信息", false); return; }
 
-      try {
-        // 1. 打开搜索页获取笔记链接列表
-        const tabResponse = await new Promise(resolve => {
-          chrome.runtime.sendMessage({ action: "fetchSearchResults", keyword }, resolve);
+        chrome.storage.local.set({
+          xhs_smart_extract: { keyword, apikey: cfg.apikey, baseurl: cfg.baseurl, model: cfg.model, prompt, count }
+        }, () => {
+          panel.remove();
+          window.location.href = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}&source=web_search_result_notes`;
         });
-
-        const noteLinks = tabResponse?.notes || [];
-        if (noteLinks.length === 0) {
-          statusEl.textContent = "未找到搜索结果";
-          extractBtn.disabled = false;
-          extractBtn.textContent = "🔍 搜索并提取";
-          return;
-        }
-
-        statusEl.textContent = `找到 ${noteLinks.length} 条笔记，逐个提取中...`;
-        extractBtn.textContent = "📖 逐条提取中...";
-
-        // 2. 逐个打开笔记详情，提取完整数据
-        let extracted = 0;
-        const matchedNotes = [];
-
-        for (let i = 0; i < noteLinks.length && extracted < count; i++) {
-          const link = noteLinks[i];
-          statusEl.textContent = `📖 提取第 ${i+1}/${noteLinks.length} 条（已匹配 ${extracted}/${count}）`;
-
-          try {
-            // 打开笔记详情页提取完整数据
-            const detailResponse = await new Promise(resolve => {
-              chrome.runtime.sendMessage({ action: "extractNote", url: link.url }, resolve);
-            });
-
-            const noteData = detailResponse?.data;
-            if (!noteData || (!noteData.title && !noteData.desc)) {
-              statusEl.textContent = `⚠️ 第 ${i+1} 条提取失败，跳过`;
-              await new Promise(r => setTimeout(r, 300));
-              continue;
-            }
-
-            // 3. 发给大模型判断
-            statusEl.textContent = `🤖 AI判断第 ${i+1} 条：${noteData.title?.substring(0, 20) || "无标题"}...`;
-            const aiResult = await callLLM(apikey, baseurl, model, prompt, noteData);
-
-            if (aiResult.match) {
-              matchedNotes.push(noteData);
-              extracted++;
-              statusEl.textContent = `✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${noteData.title?.substring(0, 30) || "无标题"}`;
-            } else {
-              statusEl.textContent = `❌ 第 ${i+1} 条不匹配：${aiResult.reason?.substring(0, 50) || "不符合条件"}`;
-            }
-
-          } catch (err) {
-            statusEl.textContent = `⚠️ 第 ${i+1} 条处理失败：${err.message}`;
-          }
-
-          await new Promise(r => setTimeout(r, 500));
-        }
-
-        // 4. 把匹配的笔记加入待提取队列
-        for (const note of matchedNotes) {
-          if (!noteQueue.find(n => n.url?.includes(note.url))) {
-            noteQueue.push(note);
-          }
-        }
-        updateQueuePanel();
-
-        statusEl.textContent = `🎉 完成！已将 ${matchedNotes.length} 篇笔记加入待提取`;
-        extractBtn.disabled = false;
-        extractBtn.textContent = "🔍 搜索并提取";
-
-      } catch (err) {
-        console.error("[XHS-Copy] 搜索提取失败:", err);
-        statusEl.textContent = `❌ 失败：${err.message}`;
-        extractBtn.disabled = false;
-        extractBtn.textContent = "🔍 搜索并提取";
-      }
+      });
     });
 
     // 点击面板外部关闭
