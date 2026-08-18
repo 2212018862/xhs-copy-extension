@@ -1510,9 +1510,6 @@
       if (!apikey || !baseurl || !model) { showToast("请先配置大模型信息", false); return; }
       if (!prompt) { showToast("请输入提示词", false); return; }
 
-      // 保存LLM配置
-      chrome.storage.local.set({ xhs_llm_config: { apikey, baseurl, model } });
-
       const statusEl = panel.querySelector("#xhs-extract-status");
       const extractBtn = panel.querySelector("#xhs-search-extract");
       extractBtn.disabled = true;
@@ -1520,84 +1517,71 @@
       statusEl.textContent = "正在搜索笔记...";
 
       try {
-        // 1. 获取筛选条件
-        const filters = {};
-        panel.querySelectorAll(".xhs-filter-row").forEach(row => {
-          const filterName = row.dataset.filter;
-          const activeItem = row.querySelector(".xhs-filter-item.active");
-          filters[filterName] = activeItem?.dataset.value || "";
-        });
-
-        // 2. 用background fetch搜索页面
-        const searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}&source=web_search_result_notes`;
-        const searchResponse = await new Promise(resolve => {
-          chrome.runtime.sendMessage({ action: "fetchNote", url: searchUrl }, resp => {
-            if (chrome.runtime.lastError) { resolve({ data: null }); return; }
-            resolve(resp);
-          });
-        });
-
-        // 3. 解析搜索结果页面中的笔记链接
-        // 打开搜索页获取笔记列表
+        // 1. 打开搜索页获取笔记链接列表
         const tabResponse = await new Promise(resolve => {
-          chrome.runtime.sendMessage({ action: "fetchSearchResults", keyword, filters }, resolve);
+          chrome.runtime.sendMessage({ action: "fetchSearchResults", keyword }, resolve);
         });
 
-        const notes = tabResponse?.notes || [];
-        if (notes.length === 0) {
+        const noteLinks = tabResponse?.notes || [];
+        if (noteLinks.length === 0) {
           statusEl.textContent = "未找到搜索结果";
           extractBtn.disabled = false;
           extractBtn.textContent = "🔍 搜索并提取";
           return;
         }
 
-        statusEl.textContent = `找到 ${notes.length} 条笔记，正在用大模型筛选...`;
-        extractBtn.textContent = "🤖 AI筛选中...";
+        statusEl.textContent = `找到 ${noteLinks.length} 条笔记，逐个提取中...`;
+        extractBtn.textContent = "📖 逐条提取中...";
 
-        // 4. 逐条发送给大模型判断
+        // 2. 逐个打开笔记详情，提取完整数据
         let extracted = 0;
-        const results = [];
+        const matchedNotes = [];
 
-        for (let i = 0; i < notes.length && extracted < count; i++) {
-          const note = notes[i];
-          statusEl.textContent = `🤖 正在判断第 ${i+1}/${notes.length} 条（已匹配 ${extracted}/${count}）`;
+        for (let i = 0; i < noteLinks.length && extracted < count; i++) {
+          const link = noteLinks[i];
+          statusEl.textContent = `📖 提取第 ${i+1}/${noteLinks.length} 条（已匹配 ${extracted}/${count}）`;
 
           try {
-            const aiResult = await callLLM(apikey, baseurl, model, prompt, note);
-            if (aiResult.match) {
-              results.push(note);
-              extracted++;
-              statusEl.textContent = `✅ 第 ${i+1} 条匹配！（${extracted}/${count}） ${note.title || "无标题"}`;
-            } else {
-              statusEl.textContent = `❌ 第 ${i+1} 条不匹配：${aiResult.reason || "不符合条件"}`;
+            // 打开笔记详情页提取完整数据
+            const detailResponse = await new Promise(resolve => {
+              chrome.runtime.sendMessage({ action: "extractNote", url: link.url }, resolve);
+            });
+
+            const noteData = detailResponse?.data;
+            if (!noteData || (!noteData.title && !noteData.desc)) {
+              statusEl.textContent = `⚠️ 第 ${i+1} 条提取失败，跳过`;
+              await new Promise(r => setTimeout(r, 300));
+              continue;
             }
+
+            // 3. 发给大模型判断
+            statusEl.textContent = `🤖 AI判断第 ${i+1} 条：${noteData.title?.substring(0, 20) || "无标题"}...`;
+            const aiResult = await callLLM(apikey, baseurl, model, prompt, noteData);
+
+            if (aiResult.match) {
+              matchedNotes.push(noteData);
+              extracted++;
+              statusEl.textContent = `✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${noteData.title?.substring(0, 30) || "无标题"}`;
+            } else {
+              statusEl.textContent = `❌ 第 ${i+1} 条不匹配：${aiResult.reason?.substring(0, 50) || "不符合条件"}`;
+            }
+
           } catch (err) {
-            statusEl.textContent = `⚠️ 第 ${i+1} 条判断失败：${err.message}`;
+            statusEl.textContent = `⚠️ 第 ${i+1} 条处理失败：${err.message}`;
           }
 
-          // 短暂延迟避免请求过快
           await new Promise(r => setTimeout(r, 500));
         }
 
-        // 5. 把匹配的笔记加入待提取队列
-        for (const note of results) {
-          if (!noteQueue.find(n => n.url?.includes(note.noteId))) {
-            noteQueue.push({
-              title: note.title || "无标题",
-              desc: note.desc || "",
-              author: note.author || "",
-              url: note.url || `https://www.xiaohongshu.com/explore/${note.noteId}`,
-              tags: [],
-              images: [],
-              videoUrl: "",
-              noteType: note.type || "",
-              comments: [],
-            });
+        // 4. 把匹配的笔记加入待提取队列
+        for (const note of matchedNotes) {
+          if (!noteQueue.find(n => n.url?.includes(note.url))) {
+            noteQueue.push(note);
           }
         }
         updateQueuePanel();
 
-        statusEl.textContent = `🎉 完成！已将 ${results.length} 篇笔记加入待提取`;
+        statusEl.textContent = `🎉 完成！已将 ${matchedNotes.length} 篇笔记加入待提取`;
         extractBtn.disabled = false;
         extractBtn.textContent = "🔍 搜索并提取";
 
