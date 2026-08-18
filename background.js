@@ -122,18 +122,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg.action === "fetchSearchResults") {
-    // 打开搜索页，提取笔记列表
     const searchUrl = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(msg.keyword)}&source=web_search_result_notes`;
     chrome.tabs.create({ url: searchUrl, active: false }, (tab) => {
       const tabId = tab.id;
       let done = false;
       const cleanup = () => { if (!done) { done = true; chrome.tabs.remove(tabId).catch(() => {}); } };
 
-      const listener = (id, info) => {
-        if (id !== tabId || info.status !== "complete") return;
-        chrome.tabs.onUpdated.removeListener(listener);
-
-      // 轮询等页面渲染
       let attempts = 0;
       const tryExtract = () => {
         attempts++;
@@ -142,35 +136,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           func: () => {
             try {
               const state = window.__INITIAL_STATE__;
-              const items = state?.search?.feeds || [];
-              return items.map(item => {
-                const note = item.noteCard || item;
-                return {
-                  noteId: note.noteId || item.id || "",
+              const feeds = state?.search?.feeds || state?.search?.noteList || [];
+              const items = feeds.map(f => f.noteCard || f).filter(Boolean);
+              if (items.length > 0) {
+                return items.map(note => ({
+                  noteId: note.noteId || note.id || "",
                   title: note.displayTitle || note.title || "",
                   desc: note.desc || "",
                   author: note.user?.nickname || note.nickname || "",
                   type: note.type || "",
-                  url: `https://www.xiaohongshu.com/explore/${note.noteId || item.id || ""}`,
-                };
-              }).filter(n => n.noteId);
+                  url: `https://www.xiaohongshu.com/explore/${note.noteId || note.id || ""}`,
+                })).filter(n => n.noteId);
+              }
+              const links = document.querySelectorAll('a[href*="/explore/"]');
+              const seen = new Set();
+              return Array.from(links).map(a => {
+                const m = a.getAttribute("href")?.match(/\/explore\/([^/?#]+)/);
+                if (!m || seen.has(m[1])) return null;
+                seen.add(m[1]);
+                return { noteId: m[1], title: a.textContent?.trim()?.substring(0, 50) || "", desc: "", author: "", type: "", url: `https://www.xiaohongshu.com/explore/${m[1]}` };
+              }).filter(Boolean);
             } catch(e) { return []; }
           }
         }).then(r => {
           const notes = r?.[0]?.result || [];
-          if (notes.length > 0 || attempts >= 10) {
+          if (notes.length > 0 || attempts >= 15) {
             cleanup();
             resolve({ notes });
           } else {
-            setTimeout(tryExtract, 1000);
+            setTimeout(tryExtract, 1500);
           }
         }).catch(() => { cleanup(); resolve({ notes: [] }); });
       };
-      setTimeout(tryExtract, 2000);
-      };
-
-      chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); cleanup(); resolve({ notes: [] }); }, 15000);
+      setTimeout(tryExtract, 3000);
+      setTimeout(() => { cleanup(); resolve({ notes: [] }); }, 30000);
     });
     return true;
   }
