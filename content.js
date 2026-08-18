@@ -1231,6 +1231,25 @@
     return { match: lower.includes("true"), reason: content.substring(0, 100) };
   }
 
+  // 调用小红书MCP
+  function mcpCall(method, args) {
+    return new Promise((resolve, reject) => {
+      fetch("http://localhost:18060/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0", method: "tools/call", id: Date.now(),
+          params: { name: method, arguments: args }
+        }),
+      }).then(r => r.json())
+        .then(data => {
+          const text = data?.result?.content?.[0]?.text;
+          resolve(text ? JSON.parse(text) : null);
+        })
+        .catch(reject);
+    });
+  }
+
   function toggleSearchPanel() {
     let panel = document.getElementById("xhs-search-panel");
     if (panel) { panel.remove(); return; }
@@ -1495,25 +1514,121 @@
       panel.remove();
     });
 
-    // 搜索并提取按钮：保存设置后跳转搜索页（当前页）
-    panel.querySelector("#xhs-search-extract").addEventListener("click", () => {
+    // 搜索并提取按钮：用MCP搜索+LLM判断
+    panel.querySelector("#xhs-search-extract").addEventListener("click", async () => {
       const keyword = panel.querySelector("#xhs-search-keyword").value.trim();
       if (!keyword) { showToast("请输入搜索关键词", false); return; }
       const prompt = panel.querySelector("#xhs-llm-prompt").value.trim();
       const count = parseInt(panel.querySelector("#xhs-llm-count").value) || 3;
       if (!prompt) { showToast("请输入提示词", false); return; }
 
-      chrome.storage.local.get("xhs_llm_config", (r) => {
-        const cfg = r.xhs_llm_config || {};
-        if (!cfg.apikey || !cfg.baseurl || !cfg.model) { showToast("请先配置大模型信息", false); return; }
+      const r = await new Promise(resolve => chrome.storage.local.get("xhs_llm_config", resolve));
+      const cfg = r.xhs_llm_config || {};
+      if (!cfg.apikey || !cfg.baseurl || !cfg.model) { showToast("请先配置大模型信息", false); return; }
 
-        chrome.storage.local.set({
-          xhs_smart_extract: { keyword, apikey: cfg.apikey, baseurl: cfg.baseurl, model: cfg.model, prompt, count }
-        }, () => {
-          panel.remove();
-          window.location.href = `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(keyword)}&source=web_search_result_notes`;
-        });
+      // 收集筛选条件
+      const filters = {};
+      panel.querySelectorAll(".xhs-filter-row").forEach(row => {
+        const filterName = row.dataset.filter;
+        const activeItem = row.querySelector(".xhs-filter-item.active");
+        filters[filterName] = activeItem?.dataset.value || "";
       });
+
+      const statusEl = panel.querySelector("#xhs-extract-status");
+      const extractBtn = panel.querySelector("#xhs-search-extract");
+      extractBtn.disabled = true;
+      extractBtn.textContent = "⏳ 搜索中...";
+      statusEl.textContent = "正在通过MCP搜索笔记...";
+
+      try {
+        // 1. 用MCP搜索
+        const mcpFilters = {};
+        if (filters.sort === "time_descending") mcpFilters.sort_by = "最新";
+        else if (filters.sort === "popularity_descending") mcpFilters.sort_by = "最多点赞";
+        else if (filters.sort === "comment") mcpFilters.sort_by = "最多评论";
+        else if (filters.sort === "collect") mcpFilters.sort_by = "最多收藏";
+        if (filters.noteType === "video") mcpFilters.note_type = "视频";
+        else if (filters.noteType === "normal") mcpFilters.note_type = "图文";
+        if (filters.timeRange === "1") mcpFilters.publish_time = "一天内";
+        else if (filters.timeRange === "2") mcpFilters.publish_time = "一周内";
+        else if (filters.timeRange === "3") mcpFilters.publish_time = "半年内";
+
+        const searchResp = await mcpCall("search_feeds", { keyword, filters: mcpFilters });
+        const feeds = searchResp?.feeds || [];
+        if (feeds.length === 0) {
+          statusEl.textContent = "未找到搜索结果";
+          extractBtn.disabled = false;
+          extractBtn.textContent = "🔍 搜索并提取";
+          return;
+        }
+
+        statusEl.textContent = `找到 ${feeds.length} 条笔记，逐个提取详情...`;
+        extractBtn.textContent = "🤖 AI筛选中...";
+
+        // 2. 逐个获取笔记详情 + LLM判断
+        let extracted = 0;
+        for (let i = 0; i < feeds.length && extracted < count; i++) {
+          const feed = feeds[i];
+          const feedId = feed.id || feed.noteCard?.noteId;
+          const token = feed.xsecToken || "";
+          if (!feedId) continue;
+
+          statusEl.textContent = `📖 第 ${i+1}/${feeds.length} 条（已匹配 ${extracted}/${count}）`;
+
+          try {
+            // 用MCP获取详情
+            const detailResp = await mcpCall("get_feed_detail", { feed_id: feedId, xsec_token: token });
+            const note = detailResp?.note || {};
+            const comments = detailResp?.comments || [];
+
+            if (!note.title && !note.desc) {
+              statusEl.textContent = `⚠️ 第 ${i+1} 条详情为空，跳过`;
+              continue;
+            }
+
+            const noteData = {
+              title: note.title || "",
+              desc: note.desc || "",
+              author: note.user?.nickname || "",
+              tags: (note.tagList || []).map(t => t.name).filter(Boolean),
+              images: (note.imageList || []).map(img => img.urlDefault || img.urlPre || "").filter(Boolean),
+              videoUrl: note.video?.media?.stream?.h264?.[0]?.masterUrl || "",
+              noteType: note.type || "",
+              comments: comments.map(c => ({ user: c.userInfo?.nickname || "", content: c.content || "", likes: c.likeCount || 0 })),
+              url: `https://www.xiaohongshu.com/explore/${feedId}`,
+            };
+
+            // LLM判断
+            statusEl.textContent = `🤖 AI判断第 ${i+1} 条：${note.title?.substring(0, 20) || "无标题"}...`;
+            const aiResult = await callLLM(cfg.apikey, cfg.baseurl, cfg.model, prompt, noteData);
+
+            if (aiResult.match) {
+              if (!noteQueue.find(n => n.url?.includes(feedId))) {
+                noteQueue.push(noteData);
+              }
+              extracted++;
+              statusEl.textContent = `✅ 第 ${i+1} 条匹配！（${extracted}/${count}）${note.title?.substring(0, 30) || "无标题"}`;
+            } else {
+              statusEl.textContent = `❌ 第 ${i+1} 条不匹配：${aiResult.reason?.substring(0, 50) || ""}`;
+            }
+          } catch (err) {
+            statusEl.textContent = `⚠️ 第 ${i+1} 条失败：${err.message}`;
+          }
+
+          await new Promise(r => setTimeout(r, 300));
+        }
+
+        updateQueuePanel();
+        statusEl.textContent = `🎉 完成！已将 ${extracted} 篇笔记加入待提取`;
+        extractBtn.disabled = false;
+        extractBtn.textContent = "🔍 搜索并提取";
+
+      } catch (err) {
+        console.error("[XHS-Copy] MCP搜索提取失败:", err);
+        statusEl.textContent = `❌ 失败：${err.message}`;
+        extractBtn.disabled = false;
+        extractBtn.textContent = "🔍 搜索并提取";
+      }
     });
 
     // 点击面板外部关闭
