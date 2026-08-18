@@ -1670,6 +1670,7 @@
             const noteId = nc?.noteId || r?.id;
             const token = r?.xsecToken || "";
             if (noteId && !seen.has(noteId)) {
+              if (noteLinks.length === 0) console.log("[XHS-Copy] first note:", noteId, "token:", token ? token.substring(0, 20) + "..." : "EMPTY");
               seen.add(noteId);
               noteLinks.push({
                 noteId,
@@ -1708,6 +1709,7 @@
 
         try {
           // 跳转到笔记详情页提取数据
+          console.log("[XHS-Copy] opening note:", link.url, "noteId:", link.noteId);
           const noteDetail = await new Promise((resolve) => {
             window.location.href = link.url;
             // 等待页面加载后提取数据
